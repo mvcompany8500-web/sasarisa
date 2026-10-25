@@ -21,6 +21,7 @@ extension Brain: Thinker {}
 
 enum Brains {
     static func make(_ cfg: Config) -> Thinker {
+        if cfg.brainProvider == "combo" { return ComboBrain(cfg: cfg) }      // 조합: Aside · Claude Code · Codex, each on what it's best at
         if cfg.brainProvider == "aside" { return AsideBrain(cfg: cfg) }      // Aside's browser agent via its CLI
         if cfg.brainProvider == "codex" { return CodexBrain(cfg: cfg) }      // GPT through your signed-in Codex CLI
         if APIBrain.provider(cfg) != nil { return APIBrain(cfg: cfg) }
@@ -36,6 +37,7 @@ enum Brains {
     static func ready(_ cfg: Config) -> String? {
         let b = make(cfg)
         guard b.installed else { return nil }
+        if let c = b as? ComboBrain { return "조합 (" + c.names.map { ["codex": "Codex", "claude": "Claude Code", "aside": "Aside"][$0] ?? $0 }.joined(separator: " · ") + ")" }
         if b is CodexBrain { return "Codex (ChatGPT)" }
         if b is AsideBrain { return "Aside" }
         if b is APIBrain { return cfg.brainProvider }

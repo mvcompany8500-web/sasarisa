@@ -90,6 +90,9 @@ enum SelfTest {
         checkBool("not a wake: 사서 이사", sp.wakeRange("오늘 책 사서 집에 가") == nil)
         var chosen = Config(); chosen.brainProvider = "codex"
         checkBool("a chosen brain is used as is", Brains.make(chosen) is CodexBrain)
+        checkBool("combo splits the work", ComboBrain.pick("쿠팡에서 맥미니 찾아서 장바구니에 넣어") == "aside" && ComboBrain.pick("로그인 버그 고쳐 줘") == "claude" && ComboBrain.pick("오늘 일정 정리해 줘") == "codex")
+        chosen.brainProvider = "combo"
+        checkBool("combo is a brain", Brains.make(chosen) is ComboBrain)
         // 10/25: the name in a web address is not a call, and it's written as our address for the brain
         checkBool("name.com is not a wake", sp.wakeRange("싸싸리싸.com 들어가 있어") == nil && sp.wakeRange("사사리싸 닷컴을 입력해") == nil)
         checkBool("call, then the address", sp.stripWake("사사리사, 사사리사닷컴 열어") == "사사리사닷컴 열어")

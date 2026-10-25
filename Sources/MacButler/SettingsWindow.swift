@@ -346,7 +346,8 @@ struct SettingsView: View {
                         Choice("codex", S.t("Codex — ChatGPT 구독 (GPT)", "Codex — your ChatGPT plan (GPT)")),
                         Choice("ollama", S.t("Ollama — 이 맥에서 무료", "Ollama — free on this Mac")),
                         Choice("lmstudio", S.t("LM Studio — 이 맥에서 무료", "LM Studio — free on this Mac")),
-                        Choice("aside", S.t("Aside — Aside 브라우저", "Aside — the Aside browser"))
+                        Choice("aside", S.t("Aside — Aside 브라우저", "Aside — the Aside browser")),
+                        Choice("combo", S.t("조합 — 코덱스·클로드·Aside 나눠 맡기기 (무료 · 고사양 맥)", "Combo — Codex, Claude and Aside share the work (free · high-end Mac)"))
                     ], apiTitle: S.t("API 키 연결", "API key"), api: [
                         Choice("anthropic", "Claude (Anthropic)"),
                         Choice("openai", "GPT (OpenAI)"),
@@ -374,6 +375,13 @@ struct SettingsView: View {
                                "Codex isn't on this Mac. Install the Codex CLI and run codex login once in Terminal.")
                          : S.t("이 맥에 로그인된 Codex로 생각합니다. 빠르게가 음성 비서에 맞고, 목록 모델이 안 되면 기본으로 돌리세요.",
                                "Thinks with the Codex you're signed in to. Fast suits a voice assistant; if a listed model fails, go back to Default."))
+                case "combo":
+                    let found = [("Codex", CodexBrain.binary != nil), ("Claude Code", Config.load().claudeBinary != nil), ("Aside", AsideBrain.binary != nil)]
+                    Note(S.t("웹 심부름(사이트·메일·쇼핑·댓글)은 Aside, 코딩은 클로드 코드, 나머지는 코덱스가 맡아요. 각자 쓰시는 구독이라 추가 비용 없이 무료예요. ",
+                             "Web errands (sites, mail, shopping, comments) go to Aside, coding to Claude Code, the rest to Codex — each on your own plan, so it's free. ")
+                         + S.t("찾은 것: ", "Found: ") + found.map { $0.0 + ($0.1 ? " ✓" : " ✗") }.joined(separator: " · ") + ". "
+                         + (ComboBrain.highSpec ? S.t("이 맥은 고사양이라 잘 돌아요.", "This Mac has the memory for it.")
+                                                : S.t("여러 AI를 함께 쓰니 애플 실리콘·메모리 16GB 이상 맥을 권해요(이 맥에서도 되지만 느릴 수 있어요).", "Recommended for Apple silicon with 16 GB or more (it works here, but may be slow).")))
                 case "aside":
                     Note(AsideBrain.binary == nil
                          ? S.t("Aside 명령줄 도구가 아직 없습니다. Aside 설정 → 개발자에서 설치하고, 터미널에서 aside login 을 한 번 해 주세요.",
