@@ -23,7 +23,23 @@ enum Brains {
     static func make(_ cfg: Config) -> Thinker {
         if cfg.brainProvider == "aside" { return AsideBrain(cfg: cfg) }      // Aside's browser agent via its CLI
         if cfg.brainProvider == "codex" { return CodexBrain(cfg: cfg) }      // GPT through your signed-in Codex CLI
-        return APIBrain.provider(cfg) == nil ? Brain(cfg: cfg) : APIBrain(cfg: cfg)
+        if APIBrain.provider(cfg) != nil { return APIBrain(cfg: cfg) }
+        // Left on the default (Claude Code) but it isn't installed: use whichever agent CLI is (10/25 owner: 「AI 모두 다 되는데
+        // 왜 특정 클로드만」 — someone with only Codex or Aside shouldn't be stuck).
+        if cfg.brainProvider == "claude-code", cfg.claudeBinary == nil {
+            if CodexBrain.binary != nil { return CodexBrain(cfg: cfg) }
+            if AsideBrain.binary != nil { return AsideBrain(cfg: cfg) }
+        }
+        return Brain(cfg: cfg)
+    }
+    /// The brain that will think, by name — nil when none of them is ready (Setup shows it).
+    static func ready(_ cfg: Config) -> String? {
+        let b = make(cfg)
+        guard b.installed else { return nil }
+        if b is CodexBrain { return "Codex (ChatGPT)" }
+        if b is AsideBrain { return "Aside" }
+        if b is APIBrain { return cfg.brainProvider }
+        return "Claude Code"
     }
 }
 

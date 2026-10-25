@@ -88,6 +88,8 @@ enum SelfTest {
         checkBool("sounds like 싸싸릐싸", sp.stripWake("싸싸릐싸 몇 시야") == "몇 시야" && sp.stripWake("싸싸리싸, 몇 시야") == "몇 시야")
         checkBool("said twice keeps ?", Whisper.saidTwice("사사리사, 지금 몇 시야? 사사리사, 지금 몇 시야?") == "사사리사, 지금 몇 시야?")
         checkBool("not a wake: 사서 이사", sp.wakeRange("오늘 책 사서 집에 가") == nil)
+        var chosen = Config(); chosen.brainProvider = "codex"
+        checkBool("a chosen brain is used as is", Brains.make(chosen) is CodexBrain)
         // 10/25: the name in a web address is not a call, and it's written as our address for the brain
         checkBool("name.com is not a wake", sp.wakeRange("싸싸리싸.com 들어가 있어") == nil && sp.wakeRange("사사리싸 닷컴을 입력해") == nil)
         checkBool("call, then the address", sp.stripWake("사사리사, 사사리사닷컴 열어") == "사사리사닷컴 열어")

@@ -16,7 +16,7 @@ struct Strings {
     var speaking: String { "◉ " + name.uppercased() }
     var dictationStart: String { t("받아쓰겠습니다. 끝나면 그만이라고 해 주세요.", "Dictation on. Say stop when you're done.") }
     var micError: String { t("마이크를 열 수 없습니다", "Can't open the microphone") }
-    var noClaude: String { t("클로드 코드를 찾지 못했습니다. 설치 후 다시 켜 주세요.", "Claude Code is not installed.") }
+    var noClaude: String { t("쓸 AI를 찾지 못했습니다. 클로드 코드나 코덱스에 로그인하거나, 설정 → 두뇌에서 골라 주세요.", "No AI is ready. Log in to Claude Code or Codex, or pick a brain in Settings.") }
     var failed: String { t("잘 안 됐습니다. 다시 말씀해 주세요.", "That didn't work. Please try again.") }
     var stopped: String { t("멈췄습니다.", "Stopped.") }
     var typed: String { t("입력", "Typed") }

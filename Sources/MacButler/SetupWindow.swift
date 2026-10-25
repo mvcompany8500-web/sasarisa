@@ -12,7 +12,7 @@ final class SetupModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published var speech = false
     @Published var ax = false
     @Published var screen = false
-    @Published var claude = false
+    @Published var brain: String? = nil         // the AI that will think (Claude Code, Codex, Aside, an API or local model)
     @Published var whisperBin = false
     @Published var model = false
     @Published var voice = ""                  // the macOS voice it will speak with, e.g. "Yuna · Premium"
@@ -30,14 +30,14 @@ final class SetupModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
     }
     deinit { timer?.invalidate() }
-    var allRequired: Bool { mic && speech && ax && claude }
+    var allRequired: Bool { mic && speech && ax && brain != nil }
 
     func refresh() {
         mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         speech = SFSpeechRecognizer.authorizationStatus() == .authorized
         ax = AXIsProcessTrusted()
         screen = CGPreflightScreenCaptureAccess()
-        claude = cfg.claudeBinary != nil
+        brain = Brains.ready(Config.load())
         whisperBin = cfg.whisperBinary != nil
         model = FileManager.default.fileExists(atPath: cfg.whisperModelPath)
         let v = Mouth.bestVoice(locale: cfg.locale, chosen: cfg.sayVoice)
@@ -117,8 +117,11 @@ struct SetupView: View {
             }
             GroupBox {
                 VStack(alignment: .leading) {
-                    row(m.claude, "Claude Code", S.t("두뇌. 설치하고 터미널에서 `claude` 를 한 번 실행해 로그인하세요 (지금 쓰는 Claude 요금제 그대로).", "The brain. Install it and run `claude` once in Terminal to log in (uses your Claude plan).")) {
-                        Button(S.t("설치 방법", "How to install")) { NSWorkspace.shared.open(URL(string: "https://docs.claude.com/en/docs/claude-code/setup")!) }
+                    row(m.brain != nil, S.t("두뇌 (AI 하나)", "Brain (any one AI)"),
+                        m.brain.map { S.t("지금: \($0). 설정 → 두뇌에서 바꿀 수 있어요.", "Now: \($0). Change it in Settings → Brain.") }
+                        ?? S.t("클로드 코드(Claude 구독)나 코덱스(ChatGPT 구독)를 깔고 터미널에서 `claude` 또는 `codex` 를 한 번 실행해 로그인하세요. Aside·API 키·맥 안 무료 모델(Ollama·LM Studio)은 설정 → 두뇌에서 고르면 돼요.",
+                               "Install Claude Code (Claude plan) or Codex (ChatGPT plan) and run `claude` or `codex` once in Terminal to log in. Aside, an API key or a local model (Ollama, LM Studio) can be picked in Settings → Brain.")) {
+                        Button(S.t("두뇌 고르기", "Pick a brain")) { SettingsWindow.show(cfg: Config.load()) }
                     }
                     row(m.whisperBin, "whisper.cpp", S.t("정확한 받아쓰기 엔진: 터미널에서 `brew install whisper-cpp`", "Accurate transcription engine: `brew install whisper-cpp` in Terminal"), required: false) {
                         Button(S.t("명령 복사", "Copy command")) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString("brew install whisper-cpp cliclick", forType: .string) }
@@ -136,7 +139,7 @@ struct SetupView: View {
                 }
             }
             HStack {
-                Text(S.t("다 되면 「\(m.cfg.wakes.first ?? "사사리사")」라고 불러 보세요 — 또는 오른쪽 ⌥ 를 누른 채 말하기.", "Then say “\((m.cfg.wakes.first ?? "Jarvis").capitalized)” — or hold right ⌥ and talk."))
+                Text(S.t("다 되면 「\(m.cfg.displayName)」라고 불러 보세요 — 또는 오른쪽 ⌥ 를 누른 채 말하기.", "Then say “\(m.cfg.displayName.capitalized)” — or hold right ⌥ and talk."))
                     .font(.callout)
                 Spacer()
                 Button(m.allRequired ? S.t("시작", "Start") : S.t("나중에", "Later")) { onDone() }.keyboardShortcut(.defaultAction)
