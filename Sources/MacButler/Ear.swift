@@ -81,7 +81,8 @@ final class Ear {
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             guard let self else { return }
             log(String(format: "ear: alive · peak %.3f · floor %.4f", self.peak, self.floor))
-            if self.peak == 0, self.floor == 0, !self.muted { self.silentMinutes += 1; if self.silentMinutes == 2 { log("ear: mic sends pure silence (muted at the mic?)"); self.onDeadMic(true) } }
+            if self.peak < 0.001, self.floor < 0.0001, !self.muted {      // muted Shure: −91 dB ≈ 0.00003, never exactly 0; a live mic peaks ≥ 0.01 a minute
+                self.silentMinutes += 1; if self.silentMinutes == 2 { log("ear: mic sends pure silence (muted at the mic?)"); self.onDeadMic(true) } }
             else { if self.silentMinutes >= 2 { log("ear: sound is back"); self.onDeadMic(false) }; self.silentMinutes = 0 }
             self.peak = 0
         }
