@@ -29,6 +29,10 @@ final class Ear {
     var onSilentSpeech: ([Float]) -> Void = { _ in }
     private var silentHandled = -1
     var onLevel: (Float) -> Void = { _ in }
+    /// true: the mic has sent pure digital silence for 2 minutes (muted at the mic — 10/25 the Shure MV7+ was muted for 1.5 h
+    /// and nothing said so); false: sound is back.
+    var onDeadMic: (Bool) -> Void = { _ in }
+    private var silentMinutes = 0
     private(set) var voicing: Float = 0          // how voice-like the latest chunk was (DoubleTalk.periodicity)
 
     // Last 40 s of 16 kHz mono audio; each utterance is cut from here and re-transcribed by Whisper.
@@ -76,7 +80,10 @@ final class Ear {
         // Heartbeat for troubleshooting: loudest level heard in the last minute.
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             guard let self else { return }
-            log(String(format: "ear: alive · peak %.3f · floor %.4f", self.peak, self.floor)); self.peak = 0
+            log(String(format: "ear: alive · peak %.3f · floor %.4f", self.peak, self.floor))
+            if self.peak == 0, self.floor == 0, !self.muted { self.silentMinutes += 1; if self.silentMinutes == 2 { log("ear: mic sends pure silence (muted at the mic?)"); self.onDeadMic(true) } }
+            else { if self.silentMinutes >= 2 { log("ear: sound is back"); self.onDeadMic(false) }; self.silentMinutes = 0 }
+            self.peak = 0
         }
         log("ear on: on-device=\(recognizer.supportsOnDeviceRecognition)")
     }

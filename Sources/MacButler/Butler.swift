@@ -142,6 +142,14 @@ final class Butler {
             lastCPU = (now, Date())
         }
         // Voice with no text at all (quiet, far away) may still be the name — Whisper listens to it once
+        // A muted mic says nothing — show it (no sound, no voice: the owner may be recording)
+        ear.onDeadMic = { [weak self] dead in
+            guard let self else { return }
+            let mic = AudioDevices.device(uid: self.cfg.inputDevice)?.name ?? self.S.t("마이크", "the mic")
+            if dead { self.hud.show(self.S.t("🎙 마이크에 소리가 안 들어와요", "🎙 No sound from the mic"),
+                                    self.S.t("\(mic) 음소거(빨간불)인지 확인해 주세요", "Is \(mic) muted?"), heard: nil, color: .systemRed, speed: 1) }
+            else if self.mode == .idle { self.hud.idle() }
+        }
         ear.onSilentSpeech = { [weak self] audio in
             if let tr = self?.trainer { tr.take("", audio); return }
             guard let self, self.mode == .idle else { return }
@@ -386,6 +394,8 @@ final class Butler {
         guard cfg.ko, whisper.available, audio.count > 6000, audio.count < 72000, Parser.squash(t).count <= 24 else { return }
         // only sounds that start like the name (same first consonant group: 「서 서 있어」 for 사사리사) — not every cough,
         // clap or OBS sound (10/25: it ran on all of them and commands waited behind)
+        // voice with no text at all: only for a name typed in Latin letters (「Sasarisa」) — a Hangul name like 「거북아」 Apple writes itself
+        if t.isEmpty, Parser.match(cfg.assistantName, "^[가-힣\\s]+$") != nil { return }
         if !t.isEmpty, let n = Butler.onset(Config.hangulReading(cfg.assistantName) ?? cfg.assistantName), let h = Butler.onset(t), n != h { return }
         whisper.transcribe(audio, fallback: t, low: true) { [weak self] full in
             guard let self, self.mode == .idle else { return }
