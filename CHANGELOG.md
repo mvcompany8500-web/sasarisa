@@ -8,6 +8,9 @@
 - **Any AI, not just Claude:** setup passes with any one brain (Claude Code, Codex, Aside, an API key or a local model); if the default Claude Code isn't installed, an installed Codex or Aside is used automatically
 - **Combo brain (free, best on a high-end Mac):** Settings → 조합 — web errands go to Aside, coding to Claude Code, the rest to Codex, each on your own plan
 - **Safer and more honest:** bringing the Claude app to the front works (pressing/typing inside it stays blocked); deleting mail or messages is asked about instead of refused (emptying the trash is still never done); the brain only says it did what a tool really did, and every tool call is logged
+- **KakaoTalk replies by voice:** 「카톡 ○○님한테 △△라고 답장해」 — Sasarisa finds that chat window (a name that sounds close counts, but a short name may differ by one sound only), puts the words in its input box and sends after your 「응」; if the chat isn't open, the words wait on the clipboard and 「열어놨어」 tries again
+- **Messages to Claude are tidied so Claude understands** — your words, cleaned up; 「너」 said to the assistant becomes “Sasarisa (the voice assistant)”, and asking it to look at your conversation adds where the log is. Exactly as said only when you say 「그대로」
+- **Faster:** reading a chat app's screen no longer walks every message bubble (KakaoTalk: 10+ s → 0.05 s); “backspace” is a known key
 - **Nothing said is lost:** if a Claude window or its input box can't be found (e.g. after a Claude update), the message waits on the clipboard for ⌘V
 - Fixes: 「싸싸리싸.com 들어가」 no longer drops the name (it opens sasarisa.com); a cut-short live transcript isn't trusted over Whisper; learned steps that fail log where; memory and CPU are logged hourly
 - README demo plays all scenes again
