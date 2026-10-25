@@ -139,7 +139,13 @@ final class CodexBrain: Thinker {
         case ("item.started", "mcp_tool_call"):
             let tool = item["tool"] as? String ?? "", args = item["arguments"] as? [String: Any] ?? [:]
             turnCommands.append(Brain.commandLine(tool, args))
+            log("brain(codex) tool: \(Brain.commandLine(tool, args).prefix(160))")     // what it really did (10/25: 「세 창 눌렀다」 couldn't be checked)
             step?(Brain.stepLabel(cfg, tool, args))
+        case ("item.completed", "mcp_tool_call"):
+            let tool = item["tool"] as? String ?? "", status = item["status"] as? String ?? ""
+            let err = (item["error"] as? [String: Any])?["message"] as? String ?? ""
+            let res = ((item["result"] as? [String: Any])?["content"] as? [[String: Any]])?.compactMap { $0["text"] as? String }.joined(separator: " ") ?? ""
+            log("brain(codex) tool \(tool) → \(status) \((err.isEmpty ? res : err).prefix(120))")
         case ("item.started", "web_search"):
             step?(strings.toolNames["WebSearch"] ?? strings.working)
         case ("item.completed", "agent_message"):

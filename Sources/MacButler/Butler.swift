@@ -384,10 +384,14 @@ final class Butler {
     }
     func command(_ full: String) {
         guard mode != .busy, mode != .speaking else { return }
-        var cmd = parser.stripWake(full)
+        var cmd = Parser.ourAddress(parser.stripWake(full))
         // Whisper's text didn't match a quick command but the live text does → trust the live text for this one.
-        if parser.parse(cmd, hasYouTubeList: !ytList.isEmpty) == .none, !lastLive.isEmpty,
-           parser.parse(lastLive, hasYouTubeList: !ytList.isEmpty) != .none { log("using live text for quick command: \(lastLive)"); cmd = lastLive }
+        // (Not when the live text only reads as a broken routine: 「페이지를 내리라고 하면은」 was cut short — 10/25.)
+        let liveIntent = lastLive.isEmpty ? Intent.none : parser.parse(lastLive, hasYouTubeList: !ytList.isEmpty)
+        if parser.parse(cmd, hasYouTubeList: !ytList.isEmpty) == .none, liveIntent != .none {
+            if case .badRoutine = liveIntent { log("live text reads as a broken routine — keeping Whisper's: \(cmd)") }
+            else { log("using live text for quick command: \(lastLive)"); cmd = lastLive }
+        }
         // Whisper was set aside as "unsure" (「자비스, 아파트」 vs Apple's 「버드」): if ITS version is something known —
         // a quick command, a learned or remembered sentence — it was right; otherwise Claude sees both versions.
         let alt = parser.stripWake(whisper.lastSetAside)
@@ -1134,8 +1138,9 @@ final class Butler {
             if let (w, item, _) = AX.windows(app).compactMap({ w in AX.session(w, name).map { (w, $0.0, $0.1) } }).max(by: { $0.2 < $1.2 }) {
                 AXUIElementPerformAction(w, kAXRaiseAction as CFString); AX.press(item)
                 let title = (AX.attr(item, "AXTitle") as? String) ?? name
+                log("claude session: 「\(name)」 → opened 「\(title)」")
                 DispatchQueue.main.async { self.done(self.S.t("세션 열기", "Opened"), title) }
-            } else { DispatchQueue.main.async { self.fail(self.S.t("그 세션을 못 찾았습니다.", "Couldn't find that session.")) } }
+            } else { log("claude session: 「\(name)」 not found"); DispatchQueue.main.async { self.fail(self.S.t("그 세션을 못 찾았습니다.", "Couldn't find that session.")) } }
         }
     }
 

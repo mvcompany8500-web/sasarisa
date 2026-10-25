@@ -180,7 +180,8 @@ if args0.first == "open-app", args0.count >= 2 {
         if found != nil { break }
     }
     guard let app = found else { print("app not found: \(want)"); exit(2) }
-    guardApp(Bundle(url: app)?.bundleIdentifier, app.lastPathComponent)
+    // Bringing the Claude app to the front is fine (10/25: 「독의 클로드 눌러」 was refused) — pressing or typing inside it stays blocked.
+    if Bundle(url: app)?.bundleIdentifier != "com.anthropic.claudefordesktop" { guardApp(Bundle(url: app)?.bundleIdentifier, app.lastPathComponent) }
     let sem = DispatchSemaphore(value: 0)
     NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration()) { _, _ in sem.signal() }
     _ = sem.wait(timeout: .now() + 5); record("open-app \(app.lastPathComponent)"); print("opened \(app.lastPathComponent)"); exit(0)

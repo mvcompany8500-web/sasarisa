@@ -172,7 +172,7 @@ final class Brain {
                 let inp = c["input"] as? [String: Any] ?? [:], name = c["name"] as? String ?? ""
                 if name.hasPrefix("mcp__butler__") {
                     let t = String(name.dropFirst("mcp__butler__".count))
-                    turnCommands.append(Brain.commandLine(t, inp)); step?(stepLabel(t, inp)); continue
+                    turnCommands.append(Brain.commandLine(t, inp)); log("brain(claude) tool: \(Brain.commandLine(t, inp).prefix(160))"); step?(stepLabel(t, inp)); continue
                 }
                 if name == "Bash", let cmd = inp["command"] as? String { turnCommands.append(cmd) }
                 step?((inp["description"] as? String) ?? strings.toolNames[name] ?? strings.working)

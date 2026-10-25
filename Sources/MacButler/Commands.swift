@@ -79,13 +79,20 @@ struct Parser {
     }
     /// The assistant's name as Korean speech recognition tends to write it (see `Config.soundAlike`).
     var nameSoundsLike: String? { cfg.ko ? (Config.hangulReading(cfg.assistantName) ?? (cfg.assistantName.unicodeScalars.allSatisfy { $0.value >= 0xAC00 && $0.value < 0xD7A4 } ? cfg.assistantName : nil)).flatMap(Config.soundAlike) : nil }
+    /// The name followed by 「.com / 닷컴」 is a web address, not a call (10/25: 「싸싸리싸.com 들어가」 lost the name and opened Chrome).
+    static let notAddress = "(?!\\s*(?:\\.|닷)\\s*(?:com|컴|net|넷|kr|co\\b))"
     func wakeRange(_ t: String) -> Range<String.Index>? {
-        if let p = nameSoundsLike, let r = t.range(of: "(헤이|하이|hey)?\\s*" + p + "[~∼〜]*", options: [.regularExpression, .caseInsensitive]) { return r }
+        if let p = nameSoundsLike, let r = t.range(of: "(헤이|하이|hey)?\\s*" + p + "[~∼〜]*" + Parser.notAddress, options: [.regularExpression, .caseInsensitive]) { return r }
         for w in wakeVariants {
-            let pat = w.replacingOccurrences(of: " ", with: "").map { NSRegularExpression.escapedPattern(for: String($0)) }.joined(separator: "\\s*")
+            let pat = w.replacingOccurrences(of: " ", with: "").map { NSRegularExpression.escapedPattern(for: String($0)) }.joined(separator: "\\s*") + Parser.notAddress
             if let r = t.range(of: pat, options: [.regularExpression, .caseInsensitive]) { return r }
         }
         return nil
+    }
+    /// Our own site said aloud — 「싸싸리싸.com」「사사리사 닷컴」 — written as the address the brain can open.
+    static func ourAddress(_ t: String) -> String {
+        guard let p = Config.soundAlike("사사리사") else { return t }
+        return t.replacingOccurrences(of: p + "\\s*(?:\\.|닷)\\s*(?:com|컴)", with: "sasarisa.com", options: [.regularExpression, .caseInsensitive])
     }
     /// Removes a leading wake word ("자비스, …", "hey jarvis …", "자비스, 자비스, …").
     func stripWake(_ t: String) -> String {
