@@ -65,12 +65,15 @@ struct Parser {
     static func kakaoReply(_ s: String) -> (String, String, Bool)? {
         guard let k = s.range(of: "카(?:카오)?톡", options: .regularExpression) else { return nil }
         let rest = String(s[k.upperBound...])
-        guard let m = match(rest, "^\\s*(?:에서|으로|에|창에|방에|떠\\s*있는\\s*(?:거|창|방)(?:에서|에)?|열린\\s*(?:거|창|방)(?:에서|에)?|열려\\s*있는\\s*(?:거|창|방)(?:에서|에)?)?\\s*,?\\s*(?:(\\S+?)\\s*(?:님)?\\s*(?:한테|에게|께)\\s+)?(.+?)\\s*(?:이?라고|하고)\\s*(답장|답|보내|전송|전해|말해|입력|써|쳐|적어)") else { return nil }
+        guard let m = match(rest, "^\\s*(?:지금\\s*)?(?:(?:떠|켜져|열려)\\s*있는\\s*|열린\\s*|켜진\\s*)?(?:거|것|창|방|곳|데|대화방|채팅방)?\\s*(?:에다가|에다|에서|으로|에)?\\s*,?\\s*(?:(\\S+?)\\s*(?:님)?\\s*(?:한테|에게|께)\\s+)?(.+?)\\s*(?:이?라고|하고)\\s*(답장|답|보내|전송|전해|말해|입력|써|쳐|적어)") else { return nil }
         let text = m[2].trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return nil }
         var name = m[1].trimmingCharacters(in: .whitespaces)
         if name.hasSuffix("님") { name.removeLast() }
-        return (name, text, !["입력", "써", "쳐", "적어"].contains(m[3]))      // 「입력해·써」 = put it in, don't send (10/25)
+        // 「입력해·써」 = put it in, don't send (10/25) — unless 「입력해서 엔터까지 쳐」「입력하고 보내」 says to send it too
+        let after = rest.range(of: "(?:이?라고|하고)\\s*(?:답장|답|보내|전송|전해|말해|입력|써|쳐|적어)", options: .regularExpression).map { String(rest[$0.upperBound...]) } ?? ""
+        let sendToo = after.range(of: "엔터|보내|전송|send", options: .regularExpression) != nil
+        return (name, text, sendToo || !["입력", "써", "쳐", "적어"].contains(m[3]))
     }
     static func squash(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
     static func clean(_ s: String) -> String {
@@ -181,6 +184,13 @@ struct Parser {
         if isHush(s) { return .hush }
         if isBye(s) { return .bye }
         s = Parser.dropLeadIn(s)
+        // 「유튜브 창 다 끄고 카톡에 …라고 입력해」 — the command before 카톡 runs first (10/25: it was dropped and its words typed)
+        if let k = s.range(of: "카(?:카오)?톡", options: .regularExpression), k.lowerBound != s.startIndex,
+           Parser.kakaoReply(String(s[k.lowerBound...])) != nil,
+           let lead = Parser.splitCommands(s[..<k.lowerBound].trimmingCharacters(in: .whitespaces) + " 카톡"), lead.count >= 2 {
+            let before = Array(lead.dropLast())
+            if before.allSatisfy({ parse($0, hasYouTubeList: hasYouTubeList) != .none }) { return .multi(before + [String(s[k.lowerBound...])]) }
+        }
         if let k = Parser.kakaoReply(s) { return k.2 ? .kakaoReply(to: k.0, text: k.1) : .kakaoType(to: k.0, text: k.1) }
         if let r = Routines.match(s) { return .routine(r) }
         if let st = Parser.rewriteStyle(s) { return .rewrite(st) }
