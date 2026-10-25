@@ -210,7 +210,7 @@ if args0.first == "click", args0.count >= 3, let x = Double(args0[1]), let y = D
 }
 if args0.first == "key", args0.count >= 2 {
     let fa = NSWorkspace.shared.frontmostApplication; guardApp(fa?.bundleIdentifier, fa?.localizedName)
-    let names: [String: CGKeyCode] = ["enter": 36, "return": 36, "tab": 48, "space": 49, "delete": 51, "esc": 53, "escape": 53,
+    let names: [String: CGKeyCode] = ["enter": 36, "return": 36, "tab": 48, "space": 49, "delete": 51, "backspace": 51, "forwarddelete": 117, "del": 117, "esc": 53, "escape": 53,
         "left": 123, "right": 124, "down": 125, "up": 126, "pageup": 116, "pagedown": 121, "home": 115, "end": 119,
         "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9, "b": 11, "q": 12, "w": 13, "e": 14, "r": 15,
         "y": 16, "t": 17, "1": 18, "2": 19, "3": 20, "4": 21, "6": 22, "5": 23, "9": 25, "7": 26, "8": 28, "0": 29, "o": 31, "u": 32,
@@ -250,6 +250,9 @@ var n = 0
 // A chat window with thousands of bubbles took over 25 s and the call failed (KakaoTalk, 10/25): 4 s, then work with what's found.
 let walkUntil = Date().addingTimeInterval(4)
 var walkCut = false
+// Outside browsers, don't go inside table rows/cells (a chat log): KakaoTalk's window went from 10+ s to 0.05 s (10/25).
+// A cell's own text is still its label; web pages keep the full walk (links live inside table cells there).
+let shallowCells = !browsers.contains(front.bundleIdentifier ?? "")
 func walk(_ e: AXUIElement, _ d: Int) {
     n += 1
     if d > 60 || n > 15000 { return }
@@ -259,6 +262,7 @@ func walk(_ e: AXUIElement, _ d: Int) {
         let l = label(e)
         if !l.isEmpty || fields.contains(role) { items.append((e, role, l, f)) }
     }
+    if shallowCells, role == "AXRow" || role == "AXCell" { return }
     for c in (attr(e, "AXChildren") as? [AXUIElement]) ?? [] { walk(c, d + 1) }
 }
 walk(win, 0)

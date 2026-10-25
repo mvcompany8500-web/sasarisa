@@ -31,7 +31,10 @@ final class Butler {
     var lastLive = ""
     var ignoreUntil = Date.distantPast    // our own voice's tail right after speaking
     var previewUntil = Date.distantPast   // Settings is playing a sample voice — nothing heard is a command
-    var trainer: NameTrainer?             // Settings → 목소리로 이름 맞추기: what's heard goes here, not to commands
+    var trainer: NameTrainer?
+    /// After 「○○ 대화창이 안 열려 있어요」: 「열어놨어」「다시 해」 runs the same thing again, without the brain (10/25 it retyped an old message).
+    var retryLater: (() -> Void)?
+    var retryUntil = Date.distantPast             // Settings → 목소리로 이름 맞추기: what's heard goes here, not to commands
     var spokeAt = Date.distantPast        // when it last stopped talking (finished or interrupted)
     var lastSpoken = ""                   // its last spoken answer — its echo can lead the next recording
     var lastMedia: (play: Bool, at: Date)?
@@ -419,6 +422,9 @@ final class Butler {
             if parser.parse(alt, hasYouTubeList: !ytList.isEmpty) != .none || Learning.lookup(alt) != nil || Aliases.lookup(alt) != nil {
                 log("using Whisper's version after all (it's a known command): \(alt)"); cmd = alt
             } else { lastLive = alt }          // the brain gets both and picks by context
+        }
+        if let again = retryLater, Date() < retryUntil, Parser.match(Parser.squash(cmd), "^(열었|열어놨|열어뒀|열어놓았|열었어|켰어|다시해|다시|이제해|이제됐|됐어다시|해봐다시|tryagain|again|opened)") != nil {
+            retryLater = nil; log("retry after 「\(cmd)」"); again(); return
         }
         if cmd.isEmpty { converse(chime: true) } else { handle(cmd) }
     }
@@ -1188,12 +1194,23 @@ final class Butler {
             let title = { (w: AXUIElement) in (AX.attr(w, "AXTitle") as? String) ?? "" }
             let isMain = { (t: String) in ["카카오톡", "kakaotalk", ""].contains(t.lowercased()) }
             let want = AX.norm(name)
-            // each chat opens in its own window titled with the chat's name; with no name, the chat window in front
-            let target = want.isEmpty ? wins.first { !isMain(title($0)) } : wins.first { AX.norm(title($0)).contains(want) } ?? wins.first { want.contains(AX.norm(title($0))) && !isMain(title($0)) }
+            // each chat opens in its own window titled with the chat's name; with no name, the chat window in front.
+            // Names are matched by sound too — 「영웅」 said, the window was 「영응님」 (10/25).
+            // how far a window's name is from the one said: 0 = contains it, else sounds apart (Hangul split into its sounds)
+            let gap = { (t: String) -> Int in
+                let h = AX.norm(t).replacingOccurrences(of: "님", with: "")
+                if h.isEmpty { return 99 }
+                if h.contains(want) || want.contains(h) { return 0 }
+                return NameTrainer.distance(NameTrainer.jamo(h), NameTrainer.jamo(want))
+            }
+            let limit = want.count <= 3 ? 1 : 2      // a short name may differ by one sound only — never someone else's chat
+            let target = want.isEmpty ? wins.first { !isMain(title($0)) }
+                : wins.filter { !isMain(title($0)) }.map { ($0, gap(title($0))) }.filter { $0.1 <= limit }.min { $0.1 < $1.1 }?.0
             guard let win = target else {
                 log("kakao reply: no chat window for 「\(name)」 among \(wins.map(title))")
                 DispatchQueue.main.async {
                     self.keepForPaste(text)
+                    self.retryLater = { [weak self] in self?.kakaoReply(to: name, text: text) }; self.retryUntil = Date().addingTimeInterval(120)
                     self.fail(name.isEmpty ? self.S.t("열려 있는 카톡 대화창이 없어요. 대화창을 열고 다시 말해 주세요. 보낼 말은 복사해 뒀어요.", "No KakaoTalk chat window is open. Open it and ask again — the words are copied.")
                                            : self.S.t("「\(name)」 대화창이 열려 있지 않아요. 카톡에서 그 대화를 열고 다시 말해 주세요. 보낼 말은 복사해 뒀어요.", "The chat with “\(name)” isn't open. Open it in KakaoTalk and ask again — the words are copied."))
                 }
