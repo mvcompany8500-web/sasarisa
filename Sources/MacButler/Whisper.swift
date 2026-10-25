@@ -12,7 +12,7 @@ final class Whisper {
     let port = Int.random(in: 20_000...60_000)
     private var proc: Process?
     private var lastUse = Date()
-    private var queue: [([Float], String, (String) -> Void)] = []
+    private var queue: [([Float], String, (String) -> Void, Bool)] = []      // last: low (listening for the name in passing)
     private var running = false
 
     init(model: String, binary: String?, language: String, prompt: String) {
@@ -48,15 +48,26 @@ final class Whisper {
     private(set) var lastSetAside = ""
     /// Exactly what Whisper wrote last, before any filter (the name check looks at it even when the text was set aside).
     private(set) var lastRaw = ""
-    func transcribe(_ audio: [Float], fallback: String, done: @escaping (String) -> Void) {
+    /// One job at a time. A command goes ahead of everything; `low` jobs (is the name in this stray sound?) are skipped when
+    /// anything else is waiting — 10/25 during filming every cough, clap and OBS sound was queued and commands waited 5–26 s.
+    func transcribe(_ audio: [Float], fallback: String, low: Bool = false, done: @escaping (String) -> Void) {
         lastSetAside = ""
         guard available, audio.count > 8000 else { done(fallback); return }
-        queue.append((audio, fallback, done)); next()
+        if low {
+            guard !running, queue.isEmpty else { done(fallback); return }
+            queue.append((audio, fallback, done, true))
+        } else {
+            let stale = queue.filter { $0.3 }
+            queue.removeAll { $0.3 }
+            stale.forEach { $0.2($0.1) }
+            queue.insert((audio, fallback, done, false), at: queue.firstIndex { $0.3 } ?? queue.count)
+        }
+        next()
     }
     private func next() {
         guard !running, !queue.isEmpty else { return }
         running = true
-        let (audio, fallback, done) = queue.removeFirst()
+        let (audio, fallback, done, _) = queue.removeFirst()
         warm()
         let wav = Whisper.wav(audio)
         attempt(wav, tries: 30) { [weak self] text, words in

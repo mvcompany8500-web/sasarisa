@@ -66,7 +66,9 @@ struct Parser {
         guard let k = s.range(of: "카(?:카오)?톡", options: .regularExpression) else { return nil }
         let rest = String(s[k.upperBound...])
         guard let m = match(rest, "^\\s*(?:지금\\s*)?(?:(?:떠|켜져|열려)\\s*있는\\s*|열린\\s*|켜진\\s*)?(?:거|것|창|방|곳|데|대화방|채팅방)?\\s*(?:에다가|에다|에서|으로|에)?\\s*,?\\s*(?:(\\S+?)\\s*(?:님)?\\s*(?:한테|에게|께)\\s+)?(.+?)\\s*(?:이?라고|하고)\\s*(답장|답|보내|전송|전해|말해|입력|써|쳐|적어)") else { return nil }
-        let text = m[2].trimmingCharacters(in: .whitespaces)
+        // 「카톡창 열려있잖아. 거기에다가 오늘도 힘내세요라고」 — only the words after 「거기에다가」 are the message (10/25)
+        let text = m[2].replacingOccurrences(of: "^(?:(?:열려|켜져|떠)\\s*있(?:잖아|어|는데|지|네)[.,!]?\\s*)?(?:(?:거기|여기|그\\s*창|이\\s*창|그곳|이곳|그\\s*방|이\\s*방)\\s*(?:에다가|에다|에)\\s+)?", with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return nil }
         var name = m[1].trimmingCharacters(in: .whitespaces)
         if name.hasSuffix("님") { name.removeLast() }
@@ -97,7 +99,7 @@ struct Parser {
     /// The assistant's name as Korean speech recognition tends to write it (see `Config.soundAlike`).
     var nameSoundsLike: String? { cfg.ko ? (Config.hangulReading(cfg.assistantName) ?? (cfg.assistantName.unicodeScalars.allSatisfy { $0.value >= 0xAC00 && $0.value < 0xD7A4 } ? cfg.assistantName : nil)).flatMap(Config.soundAlike) : nil }
     /// The name followed by 「.com / 닷컴」 is a web address, not a call (10/25: 「싸싸리싸.com 들어가」 lost the name and opened Chrome).
-    static let notAddress = "(?!\\s*(?:\\.|닷)\\s*(?:com|컴|net|넷|kr|co\\b))"
+    static let notAddress = "(?!\\s*(?:(?:\\.|닷)\\s*(?:com|컴|net|넷|kr|co\\b)|버프|buff))"   // 「거북이 버프입니다」 — the channel name, not a call (10/25)
     func wakeRange(_ t: String) -> Range<String.Index>? {
         if let p = nameSoundsLike, let r = t.range(of: "(헤이|하이|hey)?\\s*" + p + "[~∼〜]*" + Parser.notAddress, options: [.regularExpression, .caseInsensitive]) { return r }
         for w in wakeVariants {
@@ -131,7 +133,7 @@ struct Parser {
 
     private var byeWords: Set<String> {
         ["됐어", "그만", "고마워", "끝", "됐다", "잘자", "쉬어", "수고했어", "꺼져",
-         "thatsall", "thanks", "thankyou", "goodnight", "nevermind", "gotosleep", "stoplistening"]
+         "땡큐", "땡큐허니", "피니쉬", "finish", "thatsall", "thanks", "thankyou", "goodnight", "nevermind", "gotosleep", "stoplistening"]
     }
     private var hushWords: Set<String> {
         ["시끄러", "시끄러워", "조용", "조용히", "조용히해", "멈춰", "스톱", "그만해", "잠깐", "잠깐만", "쉿",
@@ -191,6 +193,7 @@ struct Parser {
             let before = Array(lead.dropLast())
             if before.allSatisfy({ parse($0, hasYouTubeList: hasYouTubeList) != .none }) { return .multi(before + [String(s[k.lowerBound...])]) }
         }
+        if Parser.match(Parser.squash(s), "^카(?:카오)?톡(?:방|창)?(?:에서|에)?(?:전송|전속|보내기|엔터)(?:버튼)?(?:좀)?(?:눌러|클릭|쳐)") != nil { return .kakaoReply(to: "", text: "") }
         if let k = Parser.kakaoReply(s) { return k.2 ? .kakaoReply(to: k.0, text: k.1) : .kakaoType(to: k.0, text: k.1) }
         if let r = Routines.match(s) { return .routine(r) }
         if let st = Parser.rewriteStyle(s) { return .rewrite(st) }
@@ -521,8 +524,10 @@ struct Parser {
     }
     /// 「강남역 가는 길」「서울역 어떻게 가」「롯데월드 길 찾아 줘」「스타벅스 강남점 어디야」 → place
     static func mapPlace(_ s: String) -> String? {
-        guard let m = match(s, "^(.+?)\\s*(?:까지\\s*)?(가는\\s*길|길\\s*찾아|길찾기|어떻게\\s*가|위치\\s*알려|위치|어디야|어디\\s*있어|지도)\\s*(?:좀|줘|알려\\s*줘|보여\\s*줘|찾아\\s*줘|봐)?$") else { return nil }
+        guard let m = match(s, "^(.+?)\\s*(?:까지\\s*)?(가는\\s*(?:길|내비게이션|네비게이션|내비|네비|경로|방법)|길\\s*찾아|길찾기|어떻게\\s*가|위치\\s*알려|위치|어디야|어디\\s*있어|지도)(?:\\s*(?:좀|줘|알려\\s*줘|보여\\s*줘|찾아\\s*줘|찾아|켜\\s*줘|봐))*$") else { return nil }
         var place = m[1]
+        // 「(제주도에서) 서귀포에서 제주시로 가는 길」 → a route: 서귀포 → 제주시 (10/25: it went to a web search)
+        if let r = match(place, "^(?:.*\\s)?(\\S+?)에서\\s+(.+?)(?:으로|로|까지)?$"), squash(r[1]).count >= 2, squash(r[2]).count >= 2 { return r[1] + " → " + r[2] }
         for p in ["으로", "로", "에", "까지"] where place.hasSuffix(p) && place.count > p.count + 1 { place = String(place.dropLast(p.count)) }
         let q = squash(place)
         guard q.count >= 2, !["지금", "여기", "너", "나", "자비스", "클로드", "그거", "이거", "파일", "폴더", "설정"].contains(where: { q == $0 || q.hasPrefix($0) && q.count <= $0.count + 1 }) else { return nil }
@@ -532,7 +537,7 @@ struct Parser {
     static func splitCommands(_ s: String) -> [String]? {
         let joints: [String: String] = ["틀고": "틀어", "켜고": "켜", "끄고": "꺼", "열고": "열어", "닫고": "닫아", "멈추고": "멈춰", "줄이고": "줄여",
                                         "키우고": "키워", "하고": "해", "찾고": "찾아", "올리고": "올려", "내리고": "내려", "누르고": "눌러", "넘기고": "넘겨",
-                                        "검색하고": "검색해", "재생하고": "재생해", "맞추고": "맞춰", "알려주고": "알려 줘",
+                                        "검색하고": "검색해", "재생하고": "재생해", "가서": "가", "맞추고": "맞춰", "알려주고": "알려 줘",
                                         // 「맥미니 검색하면서 베토벤 틀어」 — 「~면서」 joins two jobs too
                                         "검색하면서": "검색해", "찾으면서": "찾아", "틀면서": "틀어", "켜면서": "켜", "하면서": "해", "보면서": "봐",
                                         "줄이면서": "줄여", "키우면서": "키워", "재생하면서": "재생해",
@@ -587,6 +592,7 @@ struct Parser {
     /// "X 멈추고 Y", "X 하고 Y", "X 그리고 Y", "X 한 다음 Y" — more than one action.
     static func isCompound(_ s: String) -> Bool {
         if [" 그리고 ", "한 다음", "하고 나서", "고 나서", "한 뒤에", "다음에 "].contains(where: { s.contains($0) }) { return true }
+        if match(s, "(?:뒤로|앞으로)\\s*가서\\s+\\S+") != nil { return true }      // 「뒤로 가서 네 번째 메일 클릭해」 (10/25: only went back)
         // 「쿠팡에서 맥미니 검색하면서 베토벤 틀어봐」 — 「~면서」 joins two jobs (10/24: it searched the whole sentence)
         if match(s, "(하|해|찾|열|틀|켜|보|키우|줄이|올리|내리)\\s*(으)?면서\\s+\\S+") != nil { return true }
         // Two sentences that each ask for something: 「베토벤 틀어봐. 볼륨은 적당하게」

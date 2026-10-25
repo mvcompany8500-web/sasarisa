@@ -304,6 +304,9 @@ final class Butler {
             let a = parser.stripWake(t)
             if a.isEmpty { hud.show(S.conversing, S.speakNow); return }
             if parser.instant(a) { handle(a); return }
+            // A plain quick command (no words of yours to type or search) runs on Apple's text right away — Whisper only
+            // adds a second or more (10/25 owner: 「음성을 받아서 진행하는데 정말 느려서 답답해 죽어」)
+            if Butler.noFreeText(parser.parse(a, hasYouTubeList: !ytList.isEmpty)) { log("quick (no Whisper wait): \(a)"); lastLive = a; command(t); return }
             refine(audio, t) { [weak self] full in self?.command(full) }
         case .dictation:
             whisper.transcribe(audio, fallback: t) { [weak self] full in self?.dictate(full) }
@@ -381,7 +384,10 @@ final class Butler {
         // every short idle utterance (≤ 3 s, a few words): 「있어」「Safari 있어」「헛소리 있어」 were the name too (10/24)
         // (also the name with a command in one breath — 「세살이 YouTube 틀어」 was 「사사리사, 유튜브 틀어」 to Whisper)
         guard cfg.ko, whisper.available, audio.count > 6000, audio.count < 72000, Parser.squash(t).count <= 24 else { return }
-        whisper.transcribe(audio, fallback: t) { [weak self] full in
+        // only sounds that start like the name (same first consonant group: 「서 서 있어」 for 사사리사) — not every cough,
+        // clap or OBS sound (10/25: it ran on all of them and commands waited behind)
+        if !t.isEmpty, let n = Butler.onset(Config.hangulReading(cfg.assistantName) ?? cfg.assistantName), let h = Butler.onset(t), n != h { return }
+        whisper.transcribe(audio, fallback: t, low: true) { [weak self] full in
             guard let self, self.mode == .idle else { return }
             guard let heard = [full, self.whisper.lastSetAside, self.whisper.lastRaw].first(where: { self.parser.wakeRange($0) != nil }) else { return }
             log("name heard by Whisper: 「\(t)」 → 「\(heard)」")
@@ -390,6 +396,21 @@ final class Butler {
             // only the name is trusted from text Whisper's own filters set aside (it may have added words nobody said)
             let rest = heard == full ? self.parser.stripWake(heard) : ""
             if rest.isEmpty { self.hud.show(self.S.conversing, self.S.speakNow) } else { self.command(heard) }
+        }
+    }
+    /// The first consonant of a Hangul word, by sound group (ㄱㄲㅋ · ㄷㄸㅌ · ㅂㅃㅍ · ㅅㅆㅈㅉㅊ); nil when it isn't Hangul.
+    static func onset(_ s: String) -> Int? {
+        guard let u = Parser.squash(s).unicodeScalars.first, u.value >= 0xAC00, u.value < 0xD7A4 else { return nil }
+        let c = Int(u.value - 0xAC00) / 588
+        let group = [0: 0, 1: 0, 15: 0, 3: 3, 4: 3, 16: 3, 7: 7, 8: 7, 17: 7, 9: 9, 10: 9, 12: 9, 13: 9, 14: 9]
+        return group[c] ?? c
+    }
+    /// Intents that carry none of the speaker's own words — Apple's live text is enough for them.
+    static func noFreeText(_ i: Intent) -> Bool {
+        switch i {
+        case .media, .closeTabs, .mediaNext, .displayOff, .closeOpened, .browser, .volume, .clock, .cancelTimers, .undo, .whatDid, .youtubeNth: return true
+        case .kakaoReply(_, let text): return text.isEmpty
+        default: return false
         }
     }
     func refine(_ audio: [Float], _ apple: String, then: @escaping (String) -> Void) {
@@ -508,7 +529,9 @@ final class Butler {
         case .cancelTimers:
             let n = Timers.cancelAll(); done(S.t("타이머", "Timer"), S.t("\(n)개 취소", "\(n) cancelled"))
         case .map(let place):
-            open("https://map.naver.com/p/search/" + enc(place)); done(S.t("지도", "Map"), place)
+            let leg = place.components(separatedBy: " → ")
+            if leg.count == 2 { open("https://www.google.com/maps/dir/" + enc(leg[0]) + "/" + enc(leg[1])) } else { open("https://map.naver.com/p/search/" + enc(place)) }
+            done(S.t("지도", "Map"), place)
         case .rewrite(let style):
             let (text, refused) = Writer.selection()
             if let refused { done(S.t("못 바꿈", "Can't"), S.t("\(refused)에서는 글을 바꾸지 않아요", "Not in \(refused)")); return }
@@ -946,7 +969,7 @@ final class Butler {
             DispatchQueue.main.async { self.cancelSend = false; self.hud.show(self.S.claudeTyping, text, heard: nil, color: amber, speed: 3) }
             AX.focus(box)
             Thread.sleep(forTimeInterval: 0.15)
-            DispatchQueue.main.sync { Hands.paste(text) }   // instant (typing 30 chars/s was the slow part)
+            if !text.isEmpty { DispatchQueue.main.sync { Hands.paste(text) } }      // "" = 「카톡 전송 눌러」: send what's already there   // instant (typing 30 chars/s was the slow part)
             var cancelled = false
             if self.cfg.previewBeforeSend {
                 // 보내기 전 미리 보기 (a viewer's request, 10/24): the message waits in the box until a spoken 「응」; no answer = not sent.
@@ -1266,7 +1289,7 @@ final class Butler {
                 log("kakao reply sent → 「\(who)」: \(text)")
                 DispatchQueue.main.async { Sound.named("Pop"); self.done(self.S.t("카톡 보냄", "Sent on KakaoTalk"), "\(who) · \(text)") }
             } else {
-                AX.focus(box); Hands.key(0, .maskCommand); Thread.sleep(forTimeInterval: 0.05); Hands.key(51)   // ⌘A, delete — take the words back out
+                if !text.isEmpty { AX.focus(box); Hands.key(0, .maskCommand); Thread.sleep(forTimeInterval: 0.05); Hands.key(51) }   // ⌘A, delete — take our words back out (never the owner's)
                 log("kakao reply not sent (no yes)")
                 DispatchQueue.main.async { Sound.named("Pop"); self.done(self.S.t("안 보냄", "Not sent"), text) }
             }
