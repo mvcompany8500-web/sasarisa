@@ -568,6 +568,7 @@ final class Butler {
         case .bye: Sound.named("Pop"); goIdle()
         case .type(let text): Hands.paste(text); done(S.typed, text)
         case .kakaoReply(let to, let text): kakaoReply(to: to, text: text)
+        case .kakaoType(let to, let text): kakaoReply(to: to, text: text, send: false)
         case .claude(let target, let message, let newSession):
             // Your own spoken request goes straight through (unless confirmDelegate = "always").
             if cfg.confirmDelegate == "always" { askToDelegate(target: target, message: message, newSession: newSession, said: cmd) }
@@ -1194,7 +1195,7 @@ final class Butler {
 
     /// 「카톡 영웅님한테 아 힘들다라고 답장해」: find that chat window (or the chat in front), put the words in its input box,
     /// and send after a spoken yes (free mode sends right away). Never the brain fumbling with coordinates (10/25).
-    func kakaoReply(to name: String, text: String) {
+    func kakaoReply(to name: String, text: String, send wantSend: Bool = true) {
         let bundle = "com.kakao.KakaoTalkMac"
         guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first else { fail(S.t("카카오톡이 켜져 있지 않아요.", "KakaoTalk isn't open.")); return }
         mode = .busy
@@ -1224,7 +1225,7 @@ final class Butler {
                 log("kakao reply: no chat window for 「\(name)」 among \(wins.map(title))")
                 DispatchQueue.main.async {
                     self.keepForPaste(text)
-                    self.retryLater = { [weak self] in self?.kakaoReply(to: name, text: text) }; self.retryUntil = Date().addingTimeInterval(120)
+                    self.retryLater = { [weak self] in self?.kakaoReply(to: name, text: text, send: wantSend) }; self.retryUntil = Date().addingTimeInterval(120)
                     self.fail(name.isEmpty ? self.S.t("열려 있는 카톡 대화창이 없어요. 대화창을 열고 다시 말해 주세요. 보낼 말은 복사해 뒀어요.", "No KakaoTalk chat window is open. Open it and ask again — the words are copied.")
                                            : self.S.t("「\(name)」 대화창이 열려 있지 않아요. 카톡에서 그 대화를 열고 다시 말해 주세요. 보낼 말은 복사해 뒀어요.", "The chat with “\(name)” isn't open. Open it in KakaoTalk and ask again — the words are copied."))
                 }
@@ -1241,6 +1242,10 @@ final class Butler {
             DispatchQueue.main.sync { Hands.paste(text) }
             let who = title(win)
             log("kakao reply: typed into 「\(who)」: \(text)")
+            if !wantSend {          // 「입력해·써」: leave it in the box, never press Enter
+                DispatchQueue.main.async { Sound.named("Pop"); self.done(self.S.t("카톡에 입력함 (안 보냄)", "Typed in KakaoTalk (not sent)"), "\(who) · \(text)") }
+                return
+            }
             var send = self.cfg.freeMode
             if !send {
                 DispatchQueue.main.async {

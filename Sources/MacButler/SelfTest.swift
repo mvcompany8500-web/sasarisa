@@ -98,6 +98,8 @@ enum SelfTest {
         check(pk, "카톡 떠 있는 거 영웅님한테 아 힘들다라고 답장해", .kakaoReply(to: "영웅", text: "아 힘들다"))
         check(pk, "카톡에 알겠어라고 보내", .kakaoReply(to: "", text: "알겠어"))
         check(pk, "카카오톡으로 엄마한테 오늘 늦어요라고 보내 줘", .kakaoReply(to: "엄마", text: "오늘 늦어요"))
+        check(pk, "지금 열려있는 카톡창에 오늘도 힘드네요 라고 입력해줘", .kakaoType(to: "", text: "오늘도 힘드네요"))
+        check(pk, "메모 창에 장보기 목록이라고 써 줘", .type("장보기 목록"))
         checkBool("opening KakaoTalk is not a reply", { if case .kakaoReply = pk.parse("카톡 열어", hasYouTubeList: false) { return false }; return true }())
         var boot = Config(); boot.assistantName = "Sasarisa"; boot.bootTitle = "M A C   B U T L E R"
         checkBool("greeting title is the assistant's name", boot.bootTitleShown == "S A S A R I S A" && Config().bootTitleShown == "S A S A R I S A")

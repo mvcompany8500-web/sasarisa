@@ -32,6 +32,7 @@ enum Intent: Equatable {
     case forgetRoutine(String)                              // 「작업 시작 루틴 지워」
     case openApp(spoken: String, app: String)
     case kakaoReply(to: String, text: String)               // 「카톡 영웅님한테 아 힘들다라고 답장해」 — typed into that chat, sent after a yes
+    case kakaoType(to: String, text: String)                // 「카톡 창에 오늘도 힘드네요라고 입력해」 — typed into that chat, not sent
     case none
 }
 
@@ -61,15 +62,15 @@ struct Parser {
     }
     /// 「카톡 떠 있는 거 영웅님한테 아 힘들다라고 답장해」 → ("영웅", "아 힘들다"); 「카톡에 알겠어라고 보내」 → ("", "알겠어").
     /// Done by Sasarisa itself (10/25: the brain fumbled it — the list timed out and it pressed Enter before typing).
-    static func kakaoReply(_ s: String) -> (String, String)? {
+    static func kakaoReply(_ s: String) -> (String, String, Bool)? {
         guard let k = s.range(of: "카(?:카오)?톡", options: .regularExpression) else { return nil }
         let rest = String(s[k.upperBound...])
-        guard let m = match(rest, "^\\s*(?:에서|으로|에|창에|방에|떠\\s*있는\\s*(?:거|창|방)(?:에서|에)?|열린\\s*(?:거|창|방)(?:에서|에)?|열려\\s*있는\\s*(?:거|창|방)(?:에서|에)?)?\\s*,?\\s*(?:(\\S+?)\\s*(?:님)?\\s*(?:한테|에게|께)\\s+)?(.+?)\\s*(?:이?라고|하고)\\s*(?:답장|답|보내|전송|전해|말해)") else { return nil }
+        guard let m = match(rest, "^\\s*(?:에서|으로|에|창에|방에|떠\\s*있는\\s*(?:거|창|방)(?:에서|에)?|열린\\s*(?:거|창|방)(?:에서|에)?|열려\\s*있는\\s*(?:거|창|방)(?:에서|에)?)?\\s*,?\\s*(?:(\\S+?)\\s*(?:님)?\\s*(?:한테|에게|께)\\s+)?(.+?)\\s*(?:이?라고|하고)\\s*(답장|답|보내|전송|전해|말해|입력|써|쳐|적어)") else { return nil }
         let text = m[2].trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return nil }
         var name = m[1].trimmingCharacters(in: .whitespaces)
         if name.hasSuffix("님") { name.removeLast() }
-        return (name, text)
+        return (name, text, !["입력", "써", "쳐", "적어"].contains(m[3]))      // 「입력해·써」 = put it in, don't send (10/25)
     }
     static func squash(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
     static func clean(_ s: String) -> String {
@@ -180,7 +181,7 @@ struct Parser {
         if isHush(s) { return .hush }
         if isBye(s) { return .bye }
         s = Parser.dropLeadIn(s)
-        if let k = Parser.kakaoReply(s) { return .kakaoReply(to: k.0, text: k.1) }
+        if let k = Parser.kakaoReply(s) { return k.2 ? .kakaoReply(to: k.0, text: k.1) : .kakaoType(to: k.0, text: k.1) }
         if let r = Routines.match(s) { return .routine(r) }
         if let st = Parser.rewriteStyle(s) { return .rewrite(st) }
         if let m = Parser.match(s, "^(.+?)\\s*루틴\\s*(지워|삭제|없애)"), let r = Routines.match(m[1]) { return .forgetRoutine(r) }
@@ -223,7 +224,11 @@ struct Parser {
 
         let tail = "\\s*(해 봐 줘|해봐줘|해 봐|해봐|해 줘|해줘|해 주세요|해|줘|좀|봐|봐 줘|봐줘|주세요)?$"
         // Korean: 「안녕하세요 라고 써 줘」
-        if let m = Parser.match(s, "^(.+?)\\s*(이?라고)\\s*(써|쳐|입력해|타이핑해|적어)\\s*(줘|주세요)?$") { return .type(m[1]) }
+        if let m = Parser.match(s, "^(.+?)\\s*(이?라고)\\s*(써|쳐|입력해|타이핑해|적어)\\s*(줘|주세요)?$") {
+            // 「지금 열려 있는 메모 창에 ○○라고 써 줘」: where to type isn't part of the text (10/25 it typed the whole sentence)
+            let text = m[1].replacingOccurrences(of: "^(?:지금\\s*)?(?:(?:열려\\s*있는|떠\\s*있는|켜져\\s*있는|열린)\\s*)?(?:\\S+\\s*)?(?:창|칸|입력칸|채팅창|메모장|메모)\\s*에\\s*", with: "", options: .regularExpression)
+            return .type(text.isEmpty ? m[1] : text)
+        }
         // English: "type hello world"
         if let m = Parser.match(s, "^(type|write)\\s+(.+)$") { return .type(m[2]) }
 
