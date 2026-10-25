@@ -42,28 +42,26 @@ screen, run commands and use the web.
 
 | You say | It does | Speed |
 |---|---|---|
-| “Sasarisa” — the default wake word, change it in settings *(or tap right ⌥)* | chime → listening; keeps listening for 30 s, no wake word needed | instant |
+| “Sasarisa” — or the name you pick in setup *(or tap right ⌥)* | chime → listening; keeps listening for 30 s, no name needed | instant |
 | **Hold right ⌥ and talk**, release | push-to-talk like Handy — exact audio, runs the moment you let go | ~1 s |
-| “아빠 왔어” / “daddy's home” | wake-up animation + spoken greeting | instant |
-| “크롬 열어” / “open Chrome” | opens the app | < 1 s |
-| “맥미니 가격 검색해” / “search for mac mini price” | Google search in your browser | < 1 s |
-| “유튜브 로파이 음악 틀어” / “play lofi music on YouTube” → “두 번째 거” / “play the second one” | plays the first result, then any other result by number | ~1 s |
-| “안녕하세요 라고 써 줘” / “type hello world” | types into the focused field | instant |
-| “받아써” / “take dictation” … “엔터” … “그만” | continuous dictation with Whisper accuracy | ~1 s per sentence |
-| “클로드코드한테 모든 프로젝트 점검해서 텔레그램으로 보내” / “ask Claude Code to …” | opens a **new Claude Code session** in the Claude app and types the task | ~2 s |
-| “○○ 세션 클로드한테 ‘테스트’라고 전달해” | finds that session in the sidebar and sends the message | ~2 s |
-| “라면 3분”, “5시에 회의 알려 줘” · “3 minute timer” | timers & reminders (they only remind) | instant |
-| “강남역 가는 길”, “몇 시야”, “소리 30” | Naver Map, time/date, volume | instant |
-| “로파이 틀고 소리 줄이고 화면 꺼” | several quick commands in one sentence, in order | instant |
-| “앞으로 ‘작업 시작’ 하면 클로드 열고 로파이 틀어” | your own routine by voice → next time just “작업 시작” | instant |
-| (select text) “이거 존댓말로 바꿔”, “영어로”, “맞춤법 고쳐” | rewrites just the selection — never presses send, ⌘Z undoes | ~4 s |
-| anything else — “지금 화면에 뭐 있어?”, “이 페이지 요약해서 메모에 붙여” | Claude Code works it out (screen, apps, web) and answers out loud | 4–20 s |
+| “I'm home” | greeting screen (flashy, calm or card only) + spoken greeting | instant |
+| “Open Chrome” | opens the app | < 1 s |
+| “Search for mac mini price” | Google search in your browser | < 1 s |
+| “Play lofi music on YouTube” → “play the second one” | plays the first result, then any other result by number | ~1 s |
+| “Type hello world” | types into the focused field | instant |
+| “Take dictation” … “enter” … “stop” | continuous dictation with Whisper accuracy | ~1 s per sentence |
+| “Ask Claude Code to check every project and send me a summary” | opens a **new Claude Code session** in the Claude app and types the task, tidied so Claude understands | ~2 s |
+| “3 minute timer”, “What time is it”, “Volume 30”, “Close all windows” | timers, time/date, volume, closes what it opened | instant |
+| (select text) “Make this polite”, “Translate this to English”, “Fix the spelling” | rewrites just the selection — never presses send, ⌘Z undoes | ~4 s |
+| anything else — “What's on my screen?”, “Summarize this page into Notes” | the AI you picked (Claude Code, Codex, Aside, an API or a local model) works it out and answers out loud | 4–20 s |
 
-While it's talking — or while Claude is still working — just say the next thing: it stops and takes the new command. “됐어” / “that's all” ends the conversation.
+Korean has even more built-in shortcuts (several commands in one breath, routines by voice, Naver Map, KakaoTalk replies); in English those go to your AI and still work, just a few seconds slower.
+
+While it's talking — or while the AI is still working — just say the next thing: it stops and takes the new command. “That's all” ends the conversation.
 
 **It grows.** Words your Mac's live recognizer keeps missing (names, product terms) are studied and added to its vocabulary after a few times; stale learned commands and temp files are swept automatically. The menu shows what it has learned.
 
-**It gets faster the more you use it.** When Claude figures out how to do something (“pause the video” → press space), Sasarisa remembers the steps and next time does it instantly, without calling Claude. Say “no / 아니” right after and it won't learn it. The menu shows today's Claude calls and tokens.
+**It gets faster the more you use it.** When Claude figures out how to do something (“pause the video” → press space), Sasarisa remembers the steps and next time does it instantly, without calling Claude. Say “no” right after and it won't learn it. The menu shows today's Claude calls and tokens.
 
 **Any language.** Korean and English have built-in quick commands; Japanese, Chinese, Spanish, French, German, Portuguese, Italian, Vietnamese, Thai and Indonesian work through Claude, which answers in your language. It picks your Mac's language on first launch.
 
