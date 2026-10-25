@@ -32,6 +32,12 @@ enum AudioDevices {
             return AudioDevice(id: id, uid: uid, name: name, input: hasStreams(id, kAudioDevicePropertyScopeInput), output: hasStreams(id, kAudioDevicePropertyScopeOutput))
         }
     }
+    static func defaultInputUID() -> String {
+        var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var id = AudioDeviceID(0); var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &id)
+        return all().first { $0.id == id }?.uid ?? ""
+    }
     static func defaultOutputName() -> String {
         var addr = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice, mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
         var id = AudioDeviceID(0); var size = UInt32(MemoryLayout<AudioDeviceID>.size)

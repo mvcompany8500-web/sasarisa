@@ -89,10 +89,10 @@ final class Ear {
             guard let self else { return }
             // Our own restart (or picking a device) also fires this — only react if the mic really stopped,
             // and never more than once every 3 s (this used to loop 70 times a minute).
-            guard !self.engine.isRunning, Date().timeIntervalSince(self.lastRestart) > 3 else { return }
+            guard self.capture == nil, !self.engine.isRunning, Date().timeIntervalSince(self.lastRestart) > 3 else { return }
             // Let the other app finish reconfiguring first (OBS + screen recording on the same mic ping-ponged with us, 10/25 17:07)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                guard let self, !self.engine.isRunning else { return }
+                guard let self, self.capture == nil, !self.engine.isRunning else { return }
                 log("ear: audio configuration changed → restarting mic"); self.restartEngine()
             }
         }
@@ -127,7 +127,19 @@ final class Ear {
         do { try startEngine(); restart() } catch { log("ear: mic restart failed: \(error)") }
     }
 
+    private var capture: MicCapture?
     private func startEngine() throws {
+        // The chosen mic isn't the Mac's default input (e.g. AirPods became the default): open it directly. Going through the
+        // engine left it in the default device's format (24 kHz AirPods vs the MV7+'s 48 kHz) and it kept failing (10/25 17:07).
+        capture?.stop(); capture = nil
+        if !inputUID.isEmpty, AudioDevices.defaultInputUID() != inputUID, AudioDevices.device(uid: inputUID) != nil {
+            let cap = MicCapture(uid: inputUID)
+            cap.onBuffer = { [weak self] b in self?.process(b) }
+            try cap.start()
+            capture = cap
+            log("ear: listening on the chosen mic directly (the Mac's default input is another device)")
+            return
+        }
         let input = engine.inputNode
         if !inputUID.isEmpty, !AudioDevices.use(inputUID, on: input.audioUnit) { log("ear: chosen mic not found → system default") }
         // The node's format, as before (this worked for hours). But if it no longer matches what the mic hardware
@@ -148,78 +160,80 @@ final class Ear {
             }
         }
         converter = nil
-        input.installTap(onBus: 0, bufferSize: 1024, format: fmt0) { [weak self] buf, _ in
-            guard let self else { return }
-            let fmt = buf.format
-            // automatic gain: learn how loud speech peaks (only while it's clearly speech), then raise it toward -12 dBFS
-            var rawRMS: Float = 0, rawPeak: Float = 0
-            if let ch = buf.floatChannelData?[0] {
-                let n = Int(buf.frameLength); var sum: Float = 0
-                for i in 0..<n { let v = ch[i]; sum += v * v; rawPeak = max(rawPeak, abs(v)) }
-                rawRMS = sqrt(sum / Float(max(n, 1)))
-            }
-            if rawRMS > max(self.floor * 4, 0.002) {
-                self.agcPeak = rawPeak > self.agcPeak ? rawPeak : self.agcPeak * 0.97   // follows a quieter voice within ~0.5 s
-                let want = min(Ear.agcMax, max(1, 0.25 / max(self.agcPeak, 0.0001)))
-                self.agcGain += (want - self.agcGain) * 0.2
-            }
-            let gain = self.agcGain
-            if self.converter?.inputFormat != fmt { self.converter = AVAudioConverter(from: fmt, to: self.target) }
-            self.lock.lock(); self.lastBuffer = Date(); self.lock.unlock()
-            var voice: Float = 0
-            if let conv = self.converter {
-                let cap = AVAudioFrameCount(Double(buf.frameLength) * 16000 / fmt.sampleRate) + 32
-                if let out = AVAudioPCMBuffer(pcmFormat: self.target, frameCapacity: cap) {
-                    var fed = false
-                    conv.convert(to: out, error: nil) { _, st in
-                        if fed { st.pointee = .noDataNow; return nil }
-                        fed = true; st.pointee = .haveData; return buf
-                    }
-                    if let d = out.floatChannelData?[0], out.frameLength > 0 {
-                        if gain > 1.05 { for i in 0..<Int(out.frameLength) { d[i] = max(-1, min(1, d[i] * gain)) } }
-                        // pitch check only for loud chunks (cheap gate) — tells a voice from breath
-                        var e: Float = 0
-                        for i in 0..<Int(out.frameLength) { e += d[i] * d[i] }
-                        if sqrt(e / Float(out.frameLength)) > 0.02 { voice = DoubleTalk.periodicity(d, Int(out.frameLength)) }
-                        self.lock.lock()
-                        self.ring.append(contentsOf: UnsafeBufferPointer(start: d, count: Int(out.frameLength)))
-                        let over = self.ring.count - 16000 * 40
-                        if over > 0 { self.ring.removeFirst(over); self.ringBase += over }
-                        self.lock.unlock()
-                    }
-                }
-            }
-            if let ch = buf.floatChannelData?[0] {
-                var sum: Float = 0
-                let n = Int(buf.frameLength)
-                for i in 0..<n { sum += ch[i] * ch[i] }
-                let rms = sqrt(sum / Float(max(n, 1)))
-                DispatchQueue.main.async {
-                    self.peak = max(self.peak, rms)
-                    if !self.muted {
-                        self.floor = rms < self.floor ? rms : self.floor * 0.998 + rms * 0.002
-                        if rms > max(self.floor * 3.5, 0.003) {
-                            // Voice after a real pause = a new utterance starts here (keep 0.4 s of lead-in).
-                            // Not once words are already in: a click or chime after you finished must not cut you off.
-                            if Date().timeIntervalSince(self.lastLoud) > self.silenceSec, self.lastText.isEmpty {
-                                self.lock.lock(); self.speechOnset = max(self.ringEnd - 6400, self.ringBase); self.lock.unlock()
-                            }
-                            self.lastLoud = Date()
-                        }
-                    }
-                    self.voicing = voice
-                    self.onLevel(self.muted ? 0 : rms)
-                }
-            }
-            if self.muted { return }
-            if gain > 1.05, let chans = buf.floatChannelData {
-                for c in 0..<Int(buf.format.channelCount) { let ch = chans[c]; for i in 0..<Int(buf.frameLength) { ch[i] = max(-1, min(1, ch[i] * gain)) } }
-            }
-            self.lock.lock(); let r = self.request; self.lock.unlock()
-            r?.append(buf)
-        }
+        input.installTap(onBus: 0, bufferSize: 1024, format: fmt0) { [weak self] buf, _ in self?.process(buf) }
         engine.prepare()
         try engine.start()
+    }
+
+    /// Every chunk of mic audio, from the engine tap or from the chosen mic opened directly (MicCapture). Audio thread.
+    private func process(_ buf: AVAudioPCMBuffer) {
+        let fmt = buf.format
+        // automatic gain: learn how loud speech peaks (only while it's clearly speech), then raise it toward -12 dBFS
+        var rawRMS: Float = 0, rawPeak: Float = 0
+        if let ch = buf.floatChannelData?[0] {
+            let n = Int(buf.frameLength); var sum: Float = 0
+            for i in 0..<n { let v = ch[i]; sum += v * v; rawPeak = max(rawPeak, abs(v)) }
+            rawRMS = sqrt(sum / Float(max(n, 1)))
+        }
+        if rawRMS > max(self.floor * 4, 0.002) {
+            self.agcPeak = rawPeak > self.agcPeak ? rawPeak : self.agcPeak * 0.97   // follows a quieter voice within ~0.5 s
+            let want = min(Ear.agcMax, max(1, 0.25 / max(self.agcPeak, 0.0001)))
+            self.agcGain += (want - self.agcGain) * 0.2
+        }
+        let gain = self.agcGain
+        if self.converter?.inputFormat != fmt { self.converter = AVAudioConverter(from: fmt, to: self.target) }
+        self.lock.lock(); self.lastBuffer = Date(); self.lock.unlock()
+        var voice: Float = 0
+        if let conv = self.converter {
+            let cap = AVAudioFrameCount(Double(buf.frameLength) * 16000 / fmt.sampleRate) + 32
+            if let out = AVAudioPCMBuffer(pcmFormat: self.target, frameCapacity: cap) {
+                var fed = false
+                conv.convert(to: out, error: nil) { _, st in
+                    if fed { st.pointee = .noDataNow; return nil }
+                    fed = true; st.pointee = .haveData; return buf
+                }
+                if let d = out.floatChannelData?[0], out.frameLength > 0 {
+                    if gain > 1.05 { for i in 0..<Int(out.frameLength) { d[i] = max(-1, min(1, d[i] * gain)) } }
+                    // pitch check only for loud chunks (cheap gate) — tells a voice from breath
+                    var e: Float = 0
+                    for i in 0..<Int(out.frameLength) { e += d[i] * d[i] }
+                    if sqrt(e / Float(out.frameLength)) > 0.02 { voice = DoubleTalk.periodicity(d, Int(out.frameLength)) }
+                    self.lock.lock()
+                    self.ring.append(contentsOf: UnsafeBufferPointer(start: d, count: Int(out.frameLength)))
+                    let over = self.ring.count - 16000 * 40
+                    if over > 0 { self.ring.removeFirst(over); self.ringBase += over }
+                    self.lock.unlock()
+                }
+            }
+        }
+        if let ch = buf.floatChannelData?[0] {
+            var sum: Float = 0
+            let n = Int(buf.frameLength)
+            for i in 0..<n { sum += ch[i] * ch[i] }
+            let rms = sqrt(sum / Float(max(n, 1)))
+            DispatchQueue.main.async {
+                self.peak = max(self.peak, rms)
+                if !self.muted {
+                    self.floor = rms < self.floor ? rms : self.floor * 0.998 + rms * 0.002
+                    if rms > max(self.floor * 3.5, 0.003) {
+                        // Voice after a real pause = a new utterance starts here (keep 0.4 s of lead-in).
+                        // Not once words are already in: a click or chime after you finished must not cut you off.
+                        if Date().timeIntervalSince(self.lastLoud) > self.silenceSec, self.lastText.isEmpty {
+                            self.lock.lock(); self.speechOnset = max(self.ringEnd - 6400, self.ringBase); self.lock.unlock()
+                        }
+                        self.lastLoud = Date()
+                    }
+                }
+                self.voicing = voice
+                self.onLevel(self.muted ? 0 : rms)
+            }
+        }
+        if self.muted { return }
+        if gain > 1.05, let chans = buf.floatChannelData {
+            for c in 0..<Int(buf.format.channelCount) { let ch = chans[c]; for i in 0..<Int(buf.frameLength) { ch[i] = max(-1, min(1, ch[i] * gain)) } }
+        }
+        self.lock.lock(); let r = self.request; self.lock.unlock()
+        r?.append(buf)
     }
 
     func restart() {
