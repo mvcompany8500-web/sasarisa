@@ -66,11 +66,11 @@ enum AX {
         AXValueGetValue(pv as! AXValue, .cgPoint, &p); AXValueGetValue(sv as! AXValue, .cgSize, &s)
         return CGRect(origin: p, size: s)
     }
-    static func walk(_ e: AXUIElement, depth: Int = 0, count: inout Int, _ visit: (AXUIElement, String) -> Void) {
+    static func walk(_ e: AXUIElement, depth: Int = 0, count: inout Int, until: Date = .distantFuture, _ visit: (AXUIElement, String) -> Void) {
         count += 1
-        if depth > 40 || count > 8000 { return }
+        if depth > 40 || count > 8000 || Date() > until { return }
         visit(e, attr(e, "AXRole") as? String ?? "")
-        for c in (attr(e, "AXChildren") as? [AXUIElement]) ?? [] { walk(c, depth: depth + 1, count: &count, visit) }
+        for c in (attr(e, "AXChildren") as? [AXUIElement]) ?? [] { walk(c, depth: depth + 1, count: &count, until: until, visit) }
     }
     static func windows(_ app: AXUIElement) -> [AXUIElement] {
         var ws = (attr(app, "AXWindows") as? [AXUIElement]) ?? []
@@ -113,7 +113,7 @@ enum AX {
     /// The chat input ("프롬프트"/"Prompt"), otherwise the lowest text box.
     static func composer(_ win: AXUIElement) -> AXUIElement? {
         var cands: [(AXUIElement, CGFloat, Bool)] = [], n = 0
-        walk(win, count: &n) { e, role in
+        walk(win, count: &n, until: Date().addingTimeInterval(3)) { e, role in      // a long chat window must not hang it
             guard role == "AXTextArea" || role == "AXTextField", let f = frame(e) else { return }
             let ph = ((attr(e, "AXPlaceholderValue") as? String ?? "") + (attr(e, "AXDescription") as? String ?? "")).lowercased()
             cands.append((e, f.maxY, ph.contains("프롬프트") || ph.contains("prompt")))

@@ -94,6 +94,11 @@ enum SelfTest {
         checkBool("combo splits the work", ComboBrain.pick("쿠팡에서 맥미니 찾아서 장바구니에 넣어") == "aside" && ComboBrain.pick("로그인 버그 고쳐 줘") == "claude" && ComboBrain.pick("오늘 일정 정리해 줘") == "codex")
         chosen.brainProvider = "combo"
         checkBool("combo is a brain", Brains.make(chosen) is ComboBrain)
+        // 10/25 카톡 답장: Sasarisa types it into that chat and asks before sending
+        check(pk, "카톡 떠 있는 거 영웅님한테 아 힘들다라고 답장해", .kakaoReply(to: "영웅", text: "아 힘들다"))
+        check(pk, "카톡에 알겠어라고 보내", .kakaoReply(to: "", text: "알겠어"))
+        check(pk, "카카오톡으로 엄마한테 오늘 늦어요라고 보내 줘", .kakaoReply(to: "엄마", text: "오늘 늦어요"))
+        checkBool("opening KakaoTalk is not a reply", { if case .kakaoReply = pk.parse("카톡 열어", hasYouTubeList: false) { return false }; return true }())
         var boot = Config(); boot.assistantName = "Sasarisa"; boot.bootTitle = "M A C   B U T L E R"
         checkBool("greeting title is the assistant's name", boot.bootTitleShown == "S A S A R I S A" && Config().bootTitleShown == "S A S A R I S A")
         boot.assistantName = "거북아"; boot.bootTitle = ""

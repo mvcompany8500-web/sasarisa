@@ -31,6 +31,7 @@ enum Intent: Equatable {
     case badRoutine(String)                                 // tried to put something that isn't a quick command in a routine
     case forgetRoutine(String)                              // 「작업 시작 루틴 지워」
     case openApp(spoken: String, app: String)
+    case kakaoReply(to: String, text: String)               // 「카톡 영웅님한테 아 힘들다라고 답장해」 — typed into that chat, sent after a yes
     case none
 }
 
@@ -57,6 +58,18 @@ struct Parser {
         guard let re = try? NSRegularExpression(pattern: pat, options: [.caseInsensitive]),
               let m = re.firstMatch(in: s, range: NSRange(s.startIndex..., in: s)) else { return nil }
         return (0..<m.numberOfRanges).map { i in Range(m.range(at: i), in: s).map { String(s[$0]) } ?? "" }
+    }
+    /// 「카톡 떠 있는 거 영웅님한테 아 힘들다라고 답장해」 → ("영웅", "아 힘들다"); 「카톡에 알겠어라고 보내」 → ("", "알겠어").
+    /// Done by Sasarisa itself (10/25: the brain fumbled it — the list timed out and it pressed Enter before typing).
+    static func kakaoReply(_ s: String) -> (String, String)? {
+        guard let k = s.range(of: "카(?:카오)?톡", options: .regularExpression) else { return nil }
+        let rest = String(s[k.upperBound...])
+        guard let m = match(rest, "^\\s*(?:에서|으로|에|창에|방에|떠\\s*있는\\s*(?:거|창|방)(?:에서|에)?|열린\\s*(?:거|창|방)(?:에서|에)?|열려\\s*있는\\s*(?:거|창|방)(?:에서|에)?)?\\s*,?\\s*(?:(\\S+?)\\s*(?:님)?\\s*(?:한테|에게|께)\\s+)?(.+?)\\s*(?:이?라고|하고)\\s*(?:답장|답|보내|전송|전해|말해)") else { return nil }
+        let text = m[2].trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return nil }
+        var name = m[1].trimmingCharacters(in: .whitespaces)
+        if name.hasSuffix("님") { name.removeLast() }
+        return (name, text)
     }
     static func squash(_ s: String) -> String { s.lowercased().filter { $0.isLetter || $0.isNumber } }
     static func clean(_ s: String) -> String {
@@ -167,6 +180,7 @@ struct Parser {
         if isHush(s) { return .hush }
         if isBye(s) { return .bye }
         s = Parser.dropLeadIn(s)
+        if let k = Parser.kakaoReply(s) { return .kakaoReply(to: k.0, text: k.1) }
         if let r = Routines.match(s) { return .routine(r) }
         if let st = Parser.rewriteStyle(s) { return .rewrite(st) }
         if let m = Parser.match(s, "^(.+?)\\s*루틴\\s*(지워|삭제|없애)"), let r = Routines.match(m[1]) { return .forgetRoutine(r) }

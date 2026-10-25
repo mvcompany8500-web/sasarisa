@@ -555,6 +555,7 @@ final class Butler {
             }
         case .bye: Sound.named("Pop"); goIdle()
         case .type(let text): Hands.paste(text); done(S.typed, text)
+        case .kakaoReply(let to, let text): kakaoReply(to: to, text: text)
         case .claude(let target, let message, let newSession):
             // Your own spoken request goes straight through (unless confirmDelegate = "always").
             if cfg.confirmDelegate == "always" { askToDelegate(target: target, message: message, newSession: newSession, said: cmd) }
@@ -1170,6 +1171,71 @@ final class Butler {
     }
 
     func fail(_ why: String) { speak(why) { [weak self] in self?.converse(keep: true) } }
+
+    /// 「카톡 영웅님한테 아 힘들다라고 답장해」: find that chat window (or the chat in front), put the words in its input box,
+    /// and send after a spoken yes (free mode sends right away). Never the brain fumbling with coordinates (10/25).
+    func kakaoReply(to name: String, text: String) {
+        let bundle = "com.kakao.KakaoTalkMac"
+        guard let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first else { fail(S.t("카카오톡이 켜져 있지 않아요.", "KakaoTalk isn't open.")); return }
+        mode = .busy
+        hud.show(S.t("◌ 카톡 답장 준비", "◌ Getting the KakaoTalk reply ready"), text, heard: name.isEmpty ? "KakaoTalk" : "\(name) · KakaoTalk", color: amber, speed: 3)
+        DispatchQueue.global().async { [weak self] in
+            guard let self else { return }
+            running.activate()
+            Thread.sleep(forTimeInterval: 0.35)
+            guard let app = AX.app(bundle) else { DispatchQueue.main.async { self.fail(self.S.t("카톡 화면을 읽지 못했어요.", "Couldn't read KakaoTalk.")) }; return }
+            let wins = AX.windows(app)
+            let title = { (w: AXUIElement) in (AX.attr(w, "AXTitle") as? String) ?? "" }
+            let isMain = { (t: String) in ["카카오톡", "kakaotalk", ""].contains(t.lowercased()) }
+            let want = AX.norm(name)
+            // each chat opens in its own window titled with the chat's name; with no name, the chat window in front
+            let target = want.isEmpty ? wins.first { !isMain(title($0)) } : wins.first { AX.norm(title($0)).contains(want) } ?? wins.first { want.contains(AX.norm(title($0))) && !isMain(title($0)) }
+            guard let win = target else {
+                log("kakao reply: no chat window for 「\(name)」 among \(wins.map(title))")
+                DispatchQueue.main.async {
+                    self.keepForPaste(text)
+                    self.fail(name.isEmpty ? self.S.t("열려 있는 카톡 대화창이 없어요. 대화창을 열고 다시 말해 주세요. 보낼 말은 복사해 뒀어요.", "No KakaoTalk chat window is open. Open it and ask again — the words are copied.")
+                                           : self.S.t("「\(name)」 대화창이 열려 있지 않아요. 카톡에서 그 대화를 열고 다시 말해 주세요. 보낼 말은 복사해 뒀어요.", "The chat with “\(name)” isn't open. Open it in KakaoTalk and ask again — the words are copied."))
+                }
+                return
+            }
+            AXUIElementPerformAction(win, kAXRaiseAction as CFString)
+            Thread.sleep(forTimeInterval: 0.2)
+            guard let box = AX.composer(win) else {
+                DispatchQueue.main.async { self.keepForPaste(text); self.fail(self.S.t("카톡 입력칸을 못 찾았어요. 보낼 말은 복사해 뒀어요(⌘V).", "Couldn't find KakaoTalk's input box — the words are copied (⌘V).")) }
+                return
+            }
+            AX.focus(box)
+            Thread.sleep(forTimeInterval: 0.15)
+            DispatchQueue.main.sync { Hands.paste(text) }
+            let who = title(win)
+            log("kakao reply: typed into 「\(who)」: \(text)")
+            var send = self.cfg.freeMode
+            if !send {
+                DispatchQueue.main.async {
+                    self.sendDecision = nil; self.awaitingSend = true; Sound.soft("Tink")
+                    self.hud.show(self.S.t("◌ \(who)님께 보낼까요? 「응」 / 「아니」", "◌ Send to \(who)? “yes” / “no”"), text, heard: nil, color: amber, speed: 1)
+                }
+                var decision: Bool? = nil
+                for _ in 0..<200 {          // 20 s
+                    Thread.sleep(forTimeInterval: 0.1)
+                    DispatchQueue.main.sync { decision = self.sendDecision ?? (self.cancelSend ? false : nil) }
+                    if decision != nil { break }
+                }
+                DispatchQueue.main.sync { self.awaitingSend = false; self.cancelSend = false }
+                send = decision == true
+            }
+            if send {
+                AX.focus(box); Hands.key(Hands.enter)
+                log("kakao reply sent → 「\(who)」: \(text)")
+                DispatchQueue.main.async { Sound.named("Pop"); self.done(self.S.t("카톡 보냄", "Sent on KakaoTalk"), "\(who) · \(text)") }
+            } else {
+                AX.focus(box); Hands.key(0, .maskCommand); Thread.sleep(forTimeInterval: 0.05); Hands.key(51)   // ⌘A, delete — take the words back out
+                log("kakao reply not sent (no yes)")
+                DispatchQueue.main.async { Sound.named("Pop"); self.done(self.S.t("안 보냄", "Not sent"), text) }
+            }
+        }
+    }
     static func cpuSeconds() -> Double {
         var r = rusage(); getrusage(RUSAGE_SELF, &r)
         return Double(r.ru_utime.tv_sec + r.ru_stime.tv_sec) + Double(r.ru_utime.tv_usec + r.ru_stime.tv_usec) / 1e6

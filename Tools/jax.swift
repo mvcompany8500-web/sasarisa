@@ -247,9 +247,13 @@ let win = w as! AXUIElement
 
 var items: [(AXUIElement, String, String, CGRect)] = []
 var n = 0
+// A chat window with thousands of bubbles took over 25 s and the call failed (KakaoTalk, 10/25): 4 s, then work with what's found.
+let walkUntil = Date().addingTimeInterval(4)
+var walkCut = false
 func walk(_ e: AXUIElement, _ d: Int) {
     n += 1
     if d > 60 || n > 15000 { return }
+    if Date() > walkUntil { walkCut = true; return }
     let role = attr(e, "AXRole") as? String ?? ""
     if clickable.contains(role) || fields.contains(role), let f = frame(e), f.width > 2, f.height > 2 {
         let l = label(e)
@@ -311,6 +315,6 @@ case "field":
 default:
     let f = a.count >= 2 ? norm(a[1]) : ""
     let shown = items.filter { f.isEmpty || norm($0.2).contains(f) }.prefix(f.isEmpty ? 80 : 150)
-    print("\(front.localizedName ?? "") · \(items.count) elements (showing \(shown.count))")
+    print("\(front.localizedName ?? "") · \(items.count) elements (showing \(shown.count))" + (walkCut ? " — big window: stopped reading after 4 s, so some may be missing (try a filter, or screenshot)" : ""))
     for (i, it) in shown.enumerated() { print("\(i + 1). \(it.1.replacingOccurrences(of: "AX", with: "")) | \(it.2.prefix(70))") }
 }
