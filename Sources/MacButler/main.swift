@@ -78,8 +78,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let u = Usage.today()
         growthItem?.title = S.t("📈 배운 명령 \(Learning.store.count)개 · 클로드 없이 바로 \(Growth.state.fastHits)번 · 익힌 낱말 \(Growth.state.wordsLearned.count)개",
                                 "📈 \(Learning.store.count) learned · \(Growth.state.fastHits) done without Claude · \(Growth.state.wordsLearned.count) new words")
-        usageItem?.title = S.t("오늘 클로드 \(u["calls"] ?? 0)번 · 토큰 \(((u["input"] ?? 0) + (u["cacheRead"] ?? 0) + (u["cacheWrite"] ?? 0) + (u["output"] ?? 0)) / 1000)천 · 배운 명령 \(Learning.store.count)개",
-                               "Today: \(u["calls"] ?? 0) Claude calls · \(((u["input"] ?? 0) + (u["cacheRead"] ?? 0) + (u["cacheWrite"] ?? 0) + (u["output"] ?? 0)) / 1000)k tokens · \(Learning.store.count) learned")
+        // summed apart from the strings: inside them the type-checker timed out on CI (macos-15, 10/23–10/25)
+        let calls: Int = u["calls"] ?? 0
+        var tokens: Int = u["input"] ?? 0
+        tokens += u["cacheRead"] ?? 0
+        tokens += u["cacheWrite"] ?? 0
+        tokens += u["output"] ?? 0
+        let k = tokens / 1000, learned = Learning.store.count
+        usageItem?.title = S.t("오늘 클로드 \(calls)번 · 토큰 \(k)천 · 배운 명령 \(learned)개", "Today: \(calls) Claude calls · \(k)k tokens · \(learned) learned")
     }
     @objc func fixPermission(_ sender: NSMenuItem) {
         let c = AppDelegate.checks[sender.tag]
