@@ -94,6 +94,19 @@ enum AX {
         return hit
     }
 
+    /// The Claude app's session list can be folded away — then no session can be found (10/25: 「워크스테이션」 wasn't, with one
+    /// window open). Press 「사이드바 표시 / Show sidebar」 if it's there; true when it was pressed.
+    static func showSidebar(_ win: AXUIElement) -> Bool {
+        var hit: AXUIElement?, n = 0
+        let names = ["사이드바 표시", "사이드바 열기", "show sidebar", "open sidebar"]
+        walk(win, count: &n, until: Date().addingTimeInterval(1.5)) { e, role in
+            guard hit == nil, role == "AXButton" else { return }
+            let t = ((attr(e, "AXTitle") as? String ?? "") + " " + (attr(e, "AXDescription") as? String ?? "")).lowercased()
+            if names.contains(where: { t.contains($0) }) { hit = e }
+        }
+        guard let hit else { return false }
+        press(hit); return true
+    }
     static func norm(_ s: String) -> String { s.lowercased().replacingOccurrences(of: "맥", with: "mac").filter { $0.isLetter || $0.isNumber } }
     /// Sidebar session whose title is closest to `want`.
     static func session(_ win: AXUIElement, _ want: String) -> (AXUIElement, Int)? {

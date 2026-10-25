@@ -904,6 +904,11 @@ final class Butler {
                     DispatchQueue.main.async { self.hud.show(self.S.claudeFindSession, title, heard: nil, color: amber, speed: 3) }
                     Thread.sleep(forTimeInterval: 0.35)
                 }
+                // the session list may be folded away — open it so the session can be found (10/25)
+                if ClaudeRelay.clearBest(target, titles: titles) == nil, !wins.contains(where: { AX.session($0, target).map { $0.1 >= 120 } == true }),
+                   wins.map({ AX.showSidebar($0) }).contains(true) {
+                    log("claude: opened the folded session list to find 「\(target)」"); Thread.sleep(forTimeInterval: 0.7)
+                }
                 if let i = ClaudeRelay.clearBest(target, titles: titles) {
                     win = wins[i]; raise(win, titles[i])
                 } else if let (w, item, _) = wins.compactMap({ w in AX.session(w, target).map { (w, $0.0, $0.1) } }).max(by: { $0.2 < $1.2 }), AX.session(w, target).map({ $0.1 >= 120 }) == true {
@@ -1167,6 +1172,9 @@ final class Butler {
             guard let self else { return }
             Thread.sleep(forTimeInterval: 0.3)
             guard let app = AX.app(Butler.claudeBundle) else { return }
+            if !AX.windows(app).contains(where: { AX.session($0, name) != nil }), AX.windows(app).map({ AX.showSidebar($0) }).contains(true) {
+                log("claude: opened the folded session list to find 「\(name)」"); Thread.sleep(forTimeInterval: 0.7)
+            }
             if let (w, item, _) = AX.windows(app).compactMap({ w in AX.session(w, name).map { (w, $0.0, $0.1) } }).max(by: { $0.2 < $1.2 }) {
                 AXUIElementPerformAction(w, kAXRaiseAction as CFString); AX.press(item)
                 let title = (AX.attr(item, "AXTitle") as? String) ?? name
