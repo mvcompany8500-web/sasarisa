@@ -102,7 +102,8 @@ final class BootScene {
 
     struct Text { var title: String; var subtitle: String; var hello: String; var strings: Strings; var locale: String }
 
-    static func play(target: CGPoint, text: Text, sound: URL?, done: @escaping () -> Void) {
+    /// calm: just the backdrop, a soft orb with two rings, the name and the greeting (no grid, radar, boot log or clock).
+    static func play(target: CGPoint, text: Text, sound: URL?, calm: Bool = false, done: @escaping () -> Void) {
         let scr = NSScreen.main!.frame
         let win = NSPanel(contentRect: scr, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         win.level = .screenSaver; win.isOpaque = false; win.backgroundColor = .clear; win.ignoresMouseEvents = true
@@ -122,15 +123,15 @@ final class BootScene {
         let grid = CAReplicatorLayer(); grid.frame = root.bounds; grid.instanceCount = Int(H / 48) + 1
         grid.instanceTransform = CATransform3DMakeTranslation(0, 48, 0)
         let gl = CALayer(); gl.frame = CGRect(x: 0, y: 0, width: W, height: 1); gl.backgroundColor = cyan.withAlphaComponent(0.05).cgColor
-        grid.addSublayer(gl); root.addSublayer(grid)
+        grid.addSublayer(gl); if !calm { root.addSublayer(grid) }
         let gridV = CAReplicatorLayer(); gridV.frame = root.bounds; gridV.instanceCount = Int(W / 48) + 1
         gridV.instanceTransform = CATransform3DMakeTranslation(48, 0, 0)
         let gv = CALayer(); gv.frame = CGRect(x: 0, y: 0, width: 1, height: H); gv.backgroundColor = cyan.withAlphaComponent(0.05).cgColor
-        gridV.addSublayer(gv); root.addSublayer(gridV)
+        gridV.addSublayer(gv); if !calm { root.addSublayer(gridV) }
         // Scan line sweeping down
         let scan = CAGradientLayer(); scan.frame = CGRect(x: 0, y: H, width: W, height: 140)
         scan.colors = [cyan.withAlphaComponent(0).cgColor, cyan.withAlphaComponent(0.18).cgColor, cyan.withAlphaComponent(0).cgColor]
-        root.addSublayer(scan)
+        if !calm { root.addSublayer(scan) }
         let sm = CABasicAnimation(keyPath: "position.y"); sm.fromValue = H + 70; sm.toValue = -70; sm.duration = 1.6
         sm.fillMode = .forwards; sm.isRemovedOnCompletion = false
         scan.add(sm, forKey: "scan")
@@ -148,22 +149,24 @@ final class BootScene {
         radar.locations = [0, 0.18, 1]
         let rmask = CAShapeLayer(); rmask.path = CGPath(ellipseIn: radar.bounds, transform: nil); radar.mask = rmask
         radar.opacity = 0
-        reactor.addSublayer(radar)
+        if !calm { reactor.addSublayer(radar) }
         let rs = CABasicAnimation(keyPath: "transform.rotation.z"); rs.toValue = -Double.pi * 2; rs.duration = 2.2; rs.repeatCount = .infinity
         radar.add(rs, forKey: "spin")
         let rf = CABasicAnimation(keyPath: "opacity"); rf.fromValue = 0; rf.toValue = 1; rf.beginTime = CACurrentMediaTime() + 0.5
         rf.duration = 0.6; rf.fillMode = .forwards; rf.isRemovedOnCompletion = false
         radar.add(rf, forKey: "in")
 
-        ticks(reactor, rc, rad: R - 6, count: 120, len: 10, width: 2, alpha: 0.55, delay: 0.15)
-        ticks(reactor, rc, rad: R - 14, count: 12, len: 22, width: 4, alpha: 0.95, delay: 0.3)
-        _ = ring(reactor, rc, R + 18, width: 1.5, dash: nil, alpha: 0.5, spin: 0, delay: 0.0)
-        _ = ring(reactor, rc, R - 40, width: 14, dash: [90, 18, 30, 18], alpha: 0.75, spin: 7, delay: 0.25)
-        _ = ring(reactor, rc, R - 72, width: 2, dash: [4, 6], alpha: 0.8, spin: -12, delay: 0.4)
-        _ = ring(reactor, rc, R - 100, width: 26, dash: nil, alpha: 0.35, spin: -5, delay: 0.55, arc: 0.28)
-        _ = ring(reactor, rc, R - 100, width: 26, dash: nil, alpha: 0.35, spin: -5, delay: 0.6, arc: 0.12)
+        if !calm {
+            ticks(reactor, rc, rad: R - 6, count: 120, len: 10, width: 2, alpha: 0.55, delay: 0.15)
+            ticks(reactor, rc, rad: R - 14, count: 12, len: 22, width: 4, alpha: 0.95, delay: 0.3)
+            _ = ring(reactor, rc, R + 18, width: 1.5, dash: nil, alpha: 0.5, spin: 0, delay: 0.0)
+            _ = ring(reactor, rc, R - 40, width: 14, dash: [90, 18, 30, 18], alpha: 0.75, spin: 7, delay: 0.25)
+            _ = ring(reactor, rc, R - 72, width: 2, dash: [4, 6], alpha: 0.8, spin: -12, delay: 0.4)
+            _ = ring(reactor, rc, R - 100, width: 26, dash: nil, alpha: 0.35, spin: -5, delay: 0.55, arc: 0.28)
+            _ = ring(reactor, rc, R - 100, width: 26, dash: nil, alpha: 0.35, spin: -5, delay: 0.6, arc: 0.12)
+        }
         _ = ring(reactor, rc, R - 140, width: 3, dash: [60, 10, 6, 10], alpha: 0.9, spin: 4, delay: 0.7)
-        _ = ring(reactor, rc, R - 175, width: 8, dash: [2, 9], alpha: 0.9, spin: -3, delay: 0.85)
+        if !calm { _ = ring(reactor, rc, R - 175, width: 8, dash: [2, 9], alpha: 0.9, spin: -3, delay: 0.85) }
         _ = ring(reactor, rc, R - 205, width: 1.5, dash: nil, alpha: 0.9, spin: 0, delay: 0.95)
         // Core
         let core = CAGradientLayer(); core.type = .radial
@@ -186,34 +189,36 @@ final class BootScene {
             core.add(pulse, forKey: "pulse")
         }
 
-        // Left: boot log with real numbers
-        let mem = SysInfo.memory(), disk = SysInfo.diskFreeGB()
-        let mono = NSFont.monospacedSystemFont(ofSize: 23, weight: .medium)
-        let log: [String] = [text.title.replacingOccurrences(of: "   ", with: "\u{1}").replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "\u{1}", with: " ") + " · BOOT SEQUENCE", "────────────────────────────────"] + text.strings.bootLines + [
-            String(format: text.strings.bootMemory, mem.used, mem.total),
-            String(format: text.strings.bootDisk, disk),
-            "> " + SysInfo.model(),
-            text.strings.bootAllGood]
-        for (i, s) in log.enumerated() {
-            let l = label(v, "", font: mono, color: i == 0 ? .white : cyan, frame: NSRect(x: 90, y: H - 230 - CGFloat(i) * 44, width: 820, height: 34))
-            type(l, s, at: 0.35 + Double(i) * 0.24, speed: 0.012)
-        }
-        // Right: clock
-        let f = DateFormatter(); f.locale = Locale(identifier: text.locale)
-        f.dateFormat = "HH:mm"; let hm = f.string(from: Date())
-        f.dateFormat = "yyyy.MM.dd  EEEE"; let ymd = f.string(from: Date())
-        let clock = label(v, hm, font: .monospacedSystemFont(ofSize: 110, weight: .thin), color: .white, frame: NSRect(x: W - 520, y: H - 330, width: 430, height: 130), align: .right)
-        let date = label(v, ymd, font: .monospacedSystemFont(ofSize: 24, weight: .regular), color: cyan, frame: NSRect(x: W - 620, y: H - 380, width: 530, height: 32), align: .right)
-        let nominal = label(v, "", font: .monospacedSystemFont(ofSize: 18, weight: .bold), color: lime, frame: NSRect(x: W - 620, y: H - 420, width: 530, height: 26), align: .right)
-        type(nominal, "● ALL SYSTEMS NOMINAL", at: 2.6)
-        clock.alphaValue = 0; date.alphaValue = 0
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            NSAnimationContext.runAnimationGroup { $0.duration = 0.6; clock.animator().alphaValue = 1; date.animator().alphaValue = 1 }
+        if !calm {
+            // Left: boot log with real numbers
+            let mem = SysInfo.memory(), disk = SysInfo.diskFreeGB()
+            let mono = NSFont.monospacedSystemFont(ofSize: 23, weight: .medium)
+            let log: [String] = [text.title.replacingOccurrences(of: "   ", with: "\u{1}").replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "\u{1}", with: " ") + " · BOOT SEQUENCE", "────────────────────────────────"] + text.strings.bootLines + [
+                String(format: text.strings.bootMemory, mem.used, mem.total),
+                String(format: text.strings.bootDisk, disk),
+                "> " + SysInfo.model(),
+                text.strings.bootAllGood]
+            for (i, s) in log.enumerated() {
+                let l = label(v, "", font: mono, color: i == 0 ? .white : cyan, frame: NSRect(x: 90, y: H - 230 - CGFloat(i) * 44, width: 820, height: 34))
+                type(l, s, at: 0.35 + Double(i) * 0.24, speed: 0.012)
+            }
+            // Right: clock
+            let f = DateFormatter(); f.locale = Locale(identifier: text.locale)
+            f.dateFormat = "HH:mm"; let hm = f.string(from: Date())
+            f.dateFormat = "yyyy.MM.dd  EEEE"; let ymd = f.string(from: Date())
+            let clock = label(v, hm, font: .monospacedSystemFont(ofSize: 110, weight: .thin), color: .white, frame: NSRect(x: W - 520, y: H - 330, width: 430, height: 130), align: .right)
+            let date = label(v, ymd, font: .monospacedSystemFont(ofSize: 24, weight: .regular), color: cyan, frame: NSRect(x: W - 620, y: H - 380, width: 530, height: 32), align: .right)
+            let nominal = label(v, "", font: .monospacedSystemFont(ofSize: 18, weight: .bold), color: lime, frame: NSRect(x: W - 620, y: H - 420, width: 530, height: 26), align: .right)
+            type(nominal, "● ALL SYSTEMS NOMINAL", at: 2.6)
+            clock.alphaValue = 0; date.alphaValue = 0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                NSAnimationContext.runAnimationGroup { $0.duration = 0.6; clock.animator().alphaValue = 1; date.animator().alphaValue = 1 }
+            }
         }
         // Bottom: name + greeting
-        let title = label(v, "", font: .monospacedSystemFont(ofSize: 76, weight: .heavy), color: cyan, frame: NSRect(x: 0, y: c.y - R - 150, width: W, height: 80), align: .center)
+        let title = label(v, "", font: calm ? .systemFont(ofSize: 64, weight: .bold) : .monospacedSystemFont(ofSize: 76, weight: .heavy), color: calm ? .white : cyan, frame: NSRect(x: 0, y: c.y - R - 150, width: W, height: 80), align: .center)
         type(title, text.title, at: 1.0, speed: 0.045)
-        let sub = label(v, "", font: .monospacedSystemFont(ofSize: 24, weight: .medium), color: NSColor(calibratedWhite: 0.85, alpha: 1), frame: NSRect(x: 0, y: c.y - R - 190, width: W, height: 30), align: .center)
+        let sub = label(v, "", font: calm ? .systemFont(ofSize: 24, weight: .medium) : .monospacedSystemFont(ofSize: 24, weight: .medium), color: NSColor(calibratedWhite: 0.85, alpha: 1), frame: NSRect(x: 0, y: c.y - R - 190, width: W, height: 30), align: .center)
         type(sub, text.subtitle, at: 1.9, speed: 0.03)
         let hello = label(v, "", font: .systemFont(ofSize: 56, weight: .bold), color: .white, frame: NSRect(x: 0, y: c.y - R - 285, width: W, height: 72), align: .center)
         type(hello, text.hello, at: 2.4, speed: 0.06)

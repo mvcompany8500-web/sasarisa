@@ -11,6 +11,7 @@ final class SettingsModel: ObservableObject {
     @Published var assistantName: String
     @Published var wakeWords: String
     @Published var greetingText: String
+    @Published var bootStyle: String
     @Published var hotkey: String
     @Published var tts: String
     @Published var sayVoice: String
@@ -51,12 +52,12 @@ final class SettingsModel: ObservableObject {
     @Published var ttsURL: String
     @Published var voiceKey = ""
     let inputs = AudioDevices.inputs(), outputs = AudioDevices.outputs()
-    private var cfg: Config
+    private(set) var cfg: Config
 
     init(_ c: Config) {
         cfg = c
         language = c.lang; activation = c.activation; userName = c.userName; assistantName = c.assistantName
-        wakeWords = c.wakeWords.joined(separator: ", "); greetingText = c.greetingText
+        wakeWords = c.wakeWords.joined(separator: ", "); greetingText = c.greetingText; bootStyle = c.bootStyle
         hotkey = c.hotkey; tts = c.tts; sayVoice = c.sayVoice
         elevenVoiceId = c.elevenLabs.voiceId; elevenKeyFile = c.elevenLabs.apiKeyFile; claudeModel = c.claudeModel
         inputDevice = c.inputDevice; outputDevice = c.outputDevice; bargeIn = c.bargeIn; hudPosition = c.hudPosition; confirmDelegate = c.confirmDelegate; freeMode = c.freeMode; growTogether = c.growTogether.isEmpty ? "together" : c.growTogether; proRemote = c.proRemote; previewBeforeSend = c.previewBeforeSend; polishDictation = c.polishDictation
@@ -121,7 +122,7 @@ final class SettingsModel: ObservableObject {
         var obj = (try? JSONSerialization.jsonObject(with: Data(contentsOf: url))) as? [String: Any] ?? [:]
         obj["language"] = language; obj["activation"] = activation; obj["userName"] = userName; obj["assistantName"] = assistantName
         obj["wakeWords"] = wakeWords.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        obj["greetingText"] = greetingText; obj["hotkey"] = hotkey; obj["tts"] = tts; obj["sayVoice"] = sayVoice
+        obj["greetingText"] = greetingText; obj["bootStyle"] = bootStyle; obj["hotkey"] = hotkey; obj["tts"] = tts; obj["sayVoice"] = sayVoice
         obj["claudeModel"] = claudeModel; obj["inputDevice"] = inputDevice; obj["outputDevice"] = outputDevice; obj["bargeIn"] = bargeIn; obj["hudPosition"] = hudPosition; obj["confirmDelegate"] = confirmDelegate; obj["freeMode"] = freeMode; obj["growTogether"] = growTogether; obj["proRemote"] = proRemote; obj["previewBeforeSend"] = previewBeforeSend; obj["polishDictation"] = polishDictation
         obj["brainProvider"] = brainProvider; obj["brainModel"] = brainModel; obj["brainBaseURL"] = brainBaseURL; obj["brainEffort"] = brainEffort
         obj["ttsVoice"] = ttsVoice; obj["ttsRegion"] = ttsRegion; obj["ttsURL"] = ttsURL
@@ -169,6 +170,15 @@ struct SettingsView: View {
                 NameTrainingRow(t: m.voice, name: m.assistantName, S: S)
                 TextField(S.t("부르는 말", "Wake words"), text: $m.wakeWords, prompt: Text(S.t("쉼표로 여러 개 · 비우면 기본값", "comma-separated · empty = default")))
                 TextField(S.t("인사말", "Greeting"), text: $m.greetingText, prompt: Text(S.t("어서 오십시오, {user}", "Welcome home, {user}.")))
+                HStack {
+                    Picker(S.t("인사 화면", "Greeting screen"), selection: $m.bootStyle) {
+                        Text(S.t("화려하게 (기본)", "Flashy (default)")).tag("reactor")
+                        Text(S.t("깔끔하게", "Calm")).tag("calm")
+                        Text(S.t("카드로만", "Card only")).tag("card")
+                    }
+                    Button(S.t("미리 보기", "Preview")) { m.save(); NotificationCenter.default.post(name: Notification.Name("MacButlerBootPreview"), object: m.bootStyle) }
+                }
+                Note(S.t("「\(m.cfg.greets.first ?? "아빠 왔어")」 하고 들어오면 나오는 화면이에요.", "What shows when you come home and say “\(m.cfg.greets.first ?? "I'm home")”."))
                 Picker(S.t("단축키로 부르기", "Wake hotkey"), selection: $m.hotkey) {
                     Text(S.t("오른쪽 ⌥ (기본)", "Right ⌥ (default)")).tag("rightOption"); Text(S.t("오른쪽 ⌘", "Right ⌘")).tag("rightCommand"); Text(S.t("끔", "Off")).tag("none")
                 }

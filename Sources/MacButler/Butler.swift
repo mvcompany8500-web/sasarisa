@@ -99,6 +99,11 @@ final class Butler {
         NotificationCenter.default.addObserver(forName: Notification.Name("MacButlerHUDPosition"), object: nil, queue: .main) { [weak self] n in
             if let p = n.object as? String { self?.hud.position = p }
         }
+        // Settings → 인사 화면 미리 보기 (object: the style to show)
+        NotificationCenter.default.addObserver(forName: Notification.Name("MacButlerBootPreview"), object: nil, queue: .main) { [weak self] n in
+            guard let self, self.mode == .idle || self.mode == .awake else { return }
+            self.greet(style: n.object as? String)
+        }
         // Setup / Settings → 화면 위치: show the card where it now sits for a moment, so you can see before choosing
         NotificationCenter.default.addObserver(forName: Notification.Name("MacButlerHUDDemo"), object: nil, queue: .main) { [weak self] _ in
             guard let self, self.mode == .idle, self.trainer == nil else { return }
@@ -1239,19 +1244,25 @@ final class Butler {
 
     // MARK: greeting / speaking
 
-    func greet() {
+    /// 「아빠 왔어」: the greeting screen in the style picked in Settings (`style` = a preview of another one).
+    func greet(style: String? = nil) {
         if mode == .speaking { return }
+        let now = Config.load(), style = style ?? now.bootStyle            // read fresh, so a change in Settings applies at once
         mode = .speaking
+        for u in cfg.greetOpen where style == now.bootStyle { if let url = URL(string: u) { NSWorkspace.shared.open(url) } }
+        if style == "card" {         // no full screen — just say hello in the card
+            speak(cfg.greeting) { [weak self] in self?.converse(keep: true) }
+            return
+        }
         ear.muted = true
         hud.hideAll(true)
-        let text = BootScene.Text(title: cfg.bootTitle, subtitle: cfg.subtitle, hello: cfg.greeting, strings: S, locale: cfg.locale)
-        BootScene.play(target: hud.orbCenterOnScreen, text: text, sound: Paths.voiceFile("boot")) { [weak self] in
+        let text = BootScene.Text(title: now.bootTitleShown, subtitle: cfg.subtitle, hello: cfg.greeting, strings: S, locale: cfg.locale)
+        BootScene.play(target: hud.orbCenterOnScreen, text: text, sound: Paths.voiceFile("boot"), calm: style == "calm") { [weak self] in
             guard let self else { return }
             self.hud.hideAll(false)
             self.hud.show(self.S.speaking, self.cfg.greeting, heard: "", speed: 1.5)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.ear.muted = false; self.ear.restart(); self.converse(keep: true) }
         }
-        for u in cfg.greetOpen { if let url = URL(string: u) { NSWorkspace.shared.open(url) } }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.35) { [weak self] in   // when the greeting text is typed out
             guard let self else { return }
             if let f = Paths.voiceFile("greeting") { Mouth.play(f) } else { self.mouth.speak(self.cfg.greeting) {} }

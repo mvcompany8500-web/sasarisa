@@ -29,7 +29,8 @@ struct Config: Codable {
     var learnedWakes: [String: [String]] = [:]   // 이름 맞추기: name → how this Mac's recognizers wrote it for the owner's voice (Settings → 목소리로 이름 맞추기)
     var greetPhrases: [String] = []     // empty → language default ("아빠 왔어", "daddy's home" …)
     var greetingText = ""               // empty → "어서 오십시오, {user}" / "Welcome home, {user}."
-    var bootTitle = "M A C   B U T L E R"
+    var bootTitle = ""                  // empty → the assistant's name, spaced out (S A S A R I S A); the old default 「M A C   B U T L E R」 counts as empty
+    var bootStyle = "reactor"           // the 「아빠 왔어」 screen: "reactor" (flashy, default) · "calm" (orb, name and greeting only) · "card" (no full screen — just the card)
     var bootSubtitle = ""               // empty → "{user}의 개인 비서" / "Personal assistant of {user}" (or a generic line)
     var greetOpen: [String] = []        // URLs to open when greeted
 
@@ -83,7 +84,7 @@ struct Config: Codable {
         func v<T: Decodable>(_ k: CodingKeys, _ def: T) -> T { (try? c.decode(T.self, forKey: k)) ?? def }
         language = v(.language, z.language); activation = v(.activation, z.activation); userName = v(.userName, z.userName); assistantName = v(.assistantName, z.assistantName)
         wakeWords = v(.wakeWords, z.wakeWords); learnedWakes = v(.learnedWakes, z.learnedWakes); greetPhrases = v(.greetPhrases, z.greetPhrases)
-        greetingText = v(.greetingText, z.greetingText); bootTitle = v(.bootTitle, z.bootTitle); bootSubtitle = v(.bootSubtitle, z.bootSubtitle)
+        greetingText = v(.greetingText, z.greetingText); bootTitle = v(.bootTitle, z.bootTitle); bootStyle = v(.bootStyle, z.bootStyle); bootSubtitle = v(.bootSubtitle, z.bootSubtitle)
         greetOpen = v(.greetOpen, z.greetOpen)
         brainProvider = v(.brainProvider, z.brainProvider); brainModel = v(.brainModel, z.brainModel); brainBaseURL = v(.brainBaseURL, z.brainBaseURL); brainEffort = v(.brainEffort, z.brainEffort)
         claudePath = v(.claudePath, z.claudePath); claudeModel = v(.claudeModel, z.claudeModel); brainAccess = v(.brainAccess, z.brainAccess); confirmDelegate = v(.confirmDelegate, z.confirmDelegate); freeMode = v(.freeMode, z.freeMode); freeModeAsked = v(.freeModeAsked, z.freeModeAsked); growTogether = v(.growTogether, z.growTogether); proRemote = v(.proRemote, z.proRemote); previewBeforeSend = v(.previewBeforeSend, z.previewBeforeSend); polishDictation = v(.polishDictation, z.polishDictation)
@@ -178,6 +179,12 @@ struct Config: Codable {
         if !greetPhrases.isEmpty { return greetPhrases }
         return ko ? ["아빠 왔어", "아빠 왔다", "일어나 \(assistantName)", "\(assistantName) 일어나", "자비스 일어나"]
                   : ["daddy's home", "i'm home", "wake up \(assistantName)"]
+    }
+    /// The big title on the greeting screen: what you set, else the assistant's name spaced out (10/25: it still said MAC BUTLER).
+    var bootTitleShown: String {
+        if !bootTitle.isEmpty, bootTitle != "M A C   B U T L E R" { return bootTitle }
+        let n = assistantName.trimmingCharacters(in: .whitespaces)
+        return (n.isEmpty ? "Sasarisa" : n).uppercased().map(String.init).joined(separator: " ")
     }
     var greeting: String { fill(greetingText.isEmpty ? (ko ? "어서 오십시오, {user}" : "Welcome home, {user}.") : greetingText) }
     var subtitle: String {
