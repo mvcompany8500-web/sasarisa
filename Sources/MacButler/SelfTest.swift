@@ -3,6 +3,7 @@ import Foundation
 
 enum SelfTest {
     static func run() -> Bool {
+        logQuiet = true
         var ko = Config(); ko.language = "ko"; ko.userName = "대표님"; ko.apps = ["브루": "Vrew"]
         var en = Config(); en.language = "en"
         let pk = Parser(cfg: ko), pe = Parser(cfg: en)

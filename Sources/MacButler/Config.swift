@@ -74,7 +74,7 @@ struct Config: Codable {
     var router = "on"                   // fast model that maps loose phrasing to quick commands: "on" (= haiku) · "off" · a model id
     var keepAudio = false               // keep the last 30 utterances (audio + text) locally to check recognition
     var showIdleOrb = true
-    var hudPosition = "bottomRight"     // where the orb & card sit: "bottomRight" (default) · "bottomLeft" · "top"
+    var hudPosition = "center"          // where the orb & card sit: "center" (default, 10/25) · "bottomCenter" · "bottomRight" · "bottomLeft" · "top"
     var hotkey = "rightOption"          // tap to wake without speaking: "rightOption", "rightCommand", "none"
 
     init() {}
@@ -271,7 +271,10 @@ enum Paths {
     }
 }
 
+/// Set by `--selftest`: its pretend brain runs must not land in the real log (10/25 they showed up as 「brain(codex) tool」).
+var logQuiet = false
 func log(_ s: String) {
+    if logQuiet { return }
     let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm:ss"
     let line = "\(f.string(from: Date())) \(s)\n"
     let url = Paths.home.appendingPathComponent("logs/butler.log")

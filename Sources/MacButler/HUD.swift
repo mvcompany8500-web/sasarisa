@@ -1,7 +1,8 @@
 import AppKit
 import QuartzCore
 
-// The face: a glowing orb + a card in the bottom-right corner (or bottom-left / top — config hudPosition). Click-through, on every Space.
+// The face: a glowing orb + a card in the middle of the screen by default (or bottom center / bottom right / bottom left / top —
+// config hudPosition, picked in Setup while watching it move). Click-through, on every Space.
 
 let cyan = NSColor(calibratedRed: 0.30, green: 0.85, blue: 1.0, alpha: 1)
 let amber = NSColor(calibratedRed: 1.0, green: 0.72, blue: 0.25, alpha: 1)
@@ -111,11 +112,14 @@ final class HUD {
         let hasHeard = !heard.stringValue.isEmpty
         let ch = max(152, 20 + 26 + (hasHeard ? 30 : 0) + 8 + th + 22)
         let scr = NSScreen.main!.visibleFrame
-        let bottom = position.hasPrefix("bottom"), right = position == "bottomRight"
-        let x = !bottom ? scr.midX - (w + 2 * m) / 2 : right ? scr.maxX - w - 2 * m + 10 : scr.minX - 10
-        // Bottom corners sit at the very bottom of the screen (beside the Dock), below where windows end.
+        // grows from the bottom edge everywhere except at the top
+        let bottom = position.hasPrefix("bottom") || position == "center", corner = position == "bottomRight" || position == "bottomLeft"
+        let right = position != "bottomLeft" && position != "top"          // the orb's side
+        let x = position == "bottomRight" ? scr.maxX - w - 2 * m + 10 : position == "bottomLeft" ? scr.minX - 10 : scr.midX - (w + 2 * m) / 2
+        // Bottom corners sit at the very bottom of the screen (beside the Dock); bottom center sits just above the Dock.
         let floorY = (NSScreen.main?.frame.minY ?? scr.minY) - 10
-        panel.setFrame(NSRect(x: x, y: bottom ? floorY : scr.maxY - ch - 2 * m + 14, width: w + 2 * m, height: ch + 2 * m), display: true)
+        let y = corner ? floorY : position == "bottomCenter" ? scr.minY - m + 12 : position == "center" ? scr.midY - (ch + 2 * m) / 2 : scr.maxY - ch - 2 * m + 14
+        panel.setFrame(NSRect(x: x, y: y, width: w + 2 * m, height: ch + 2 * m), display: true)
         panel.contentView?.frame = NSRect(x: 0, y: 0, width: w + 2 * m, height: ch + 2 * m)
         card.frame = NSRect(x: m, y: m, width: w, height: ch)
         let top = m + ch
@@ -125,6 +129,11 @@ final class HUD {
         status.frame = NSRect(x: tx, y: top - 20 - 26, width: tw, height: 26)
         heard.frame = NSRect(x: tx, y: top - 20 - 26 - 30, width: tw, height: 28)
         text.frame = NSRect(x: tx, y: m + 20, width: tw, height: th)
+    }
+    /// The places it can sit, for Setup and Settings.
+    static func positions(_ S: Strings) -> [(String, String)] {
+        [("center", S.t("화면 가운데 (기본)", "Middle of the screen (default)")), ("bottomCenter", S.t("아래 가운데 (독 위)", "Bottom center (above the Dock)")),
+         ("bottomRight", S.t("오른쪽 아래", "Bottom right")), ("bottomLeft", S.t("왼쪽 아래", "Bottom left")), ("top", S.t("위 가운데", "Top center"))]
     }
     var orbCenterOnScreen: CGPoint { CGPoint(x: panel.frame.minX + orb.frame.midX, y: panel.frame.minY + orb.frame.midY) }
 
@@ -138,7 +147,7 @@ final class HUD {
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.25
             for v in [card, status, heard, text] { v.animator().alphaValue = on ? 1 : 0 }
-            orb.animator().alphaValue = on ? 1 : (showIdleOrb ? 0.6 : 0)
+            orb.animator().alphaValue = on ? 1 : (showIdleOrb && position != "center" ? 0.6 : 0)    // no resting orb in the middle of the screen
         }
     }
     func idle() {

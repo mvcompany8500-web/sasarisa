@@ -99,6 +99,12 @@ final class Butler {
         NotificationCenter.default.addObserver(forName: Notification.Name("MacButlerHUDPosition"), object: nil, queue: .main) { [weak self] n in
             if let p = n.object as? String { self?.hud.position = p }
         }
+        // Setup / Settings → 화면 위치: show the card where it now sits for a moment, so you can see before choosing
+        NotificationCenter.default.addObserver(forName: Notification.Name("MacButlerHUDDemo"), object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.mode == .idle, self.trainer == nil else { return }
+            self.hud.show(self.S.t("✓ 여기에 떠요", "✓ It shows up here"), self.S.t("「\(self.cfg.displayName)」 하고 부르면 이 자리에 이 카드가 나와요", "Call “\(self.cfg.displayName)” and this card appears right here"), heard: "", color: lime)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in if self?.mode == .idle, self?.trainer == nil { self?.hud.idle() } }
+        }
         // Settings → 미리 듣기: don't listen to our own sample line
         NotificationCenter.default.addObserver(forName: Notification.Name("MacButlerPreview"), object: nil, queue: .main) { [weak self] n in
             self?.previewUntil = (n.object as? Bool) == true ? Date().addingTimeInterval(30) : Date().addingTimeInterval(1.0)

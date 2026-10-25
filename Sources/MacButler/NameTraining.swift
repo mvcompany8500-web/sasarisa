@@ -42,6 +42,8 @@ final class NameTrainer {
         busy = true
         let finish = { [weak self] (full: String, raw: String) in
             guard let self else { return }
+            // A voice burst nothing could read (no Whisper model yet, or just noise) isn't a take — it would count as a miss (10/25)
+            if Parser.squash(apple).isEmpty, Parser.squash(full).isEmpty, Parser.squash(raw).isEmpty { self.busy = false; log("name training: nothing readable — not counted"); return }
             self.samples.append(Sample(apple: apple, whisper: full, raw: raw, command: self.command(self.samples.count)))
             self.busy = false
             let shown = [full, apple].first { !Parser.squash($0).isEmpty } ?? ""

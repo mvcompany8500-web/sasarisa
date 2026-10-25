@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.1 — 2026-10-25 · Name it like Siri, any AI, combo brain
+- **Name your assistant first, like “Hey Siri”:** the setup window now starts with its name, what it calls you, and a **voice check** — say the name 8 times and with a short command 4 times; it learns how *your* voice comes out on *this* Mac (also in Settings → 목소리로 이름 맞추기). It shows how often it was understood before and after, and suggests another name if it's still poor. A name typed in Hangul gets the same sound-alikes as its Latin spelling
+- **Any AI, not just Claude:** setup passes with any one brain (Claude Code, Codex, Aside, an API key or a local model); if the default Claude Code isn't installed, an installed Codex or Aside is used automatically
+- **Combo brain (free, best on a high-end Mac):** Settings → 조합 — web errands go to Aside, coding to Claude Code, the rest to Codex, each on your own plan
+- **Safer and more honest:** bringing the Claude app to the front works (pressing/typing inside it stays blocked); deleting mail or messages is asked about instead of refused (emptying the trash is still never done); the brain only says it did what a tool really did, and every tool call is logged
+- **Nothing said is lost:** if a Claude window or its input box can't be found (e.g. after a Claude update), the message waits on the clipboard for ⌘V
+- Fixes: 「싸싸리싸.com 들어가」 no longer drops the name (it opens sasarisa.com); a cut-short live transcript isn't trusted over Whisper; learned steps that fail log where; memory and CPU are logged hourly
+- README demo plays all scenes again
+
 ## 0.7.0 — 2026-10-24 · Mac Butler is now **Sasarisa (사사리사)**
 - New name, one word you can say: 「사사리사」 / “Sasarisa” is the default name and wake word (heard as 사사리사·샤샤리사·싸싸리사; 「자비스」 keeps working for people who used it). Home: **sasarisa.com**
 - Your settings (`~/.macbutler`), saved keys, Pro link and learned commands carry over; the app is now `Sasarisa.app` (the old `MacButler.app` is removed by the installer)

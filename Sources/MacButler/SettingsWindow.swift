@@ -192,7 +192,7 @@ struct SettingsView: View {
                            "Before dictation is pasted, Apple Intelligence on this Mac fixes spelling, punctuation and numbers — with your Handy post-process prompt if you have one. Nothing leaves the Mac.")
                      : S.t("Apple Intelligence를 켜면 쓸 수 있어요(시스템 설정 → Apple Intelligence).", "Turn on Apple Intelligence to use it (System Settings → Apple Intelligence)."))
                 Picker(S.t("화면 위치", "On-screen position"), selection: $m.hudPosition) {
-                    Text(S.t("오른쪽 아래 (기본)", "Bottom right (default)")).tag("bottomRight"); Text(S.t("왼쪽 아래", "Bottom left")).tag("bottomLeft"); Text(S.t("위 가운데", "Top center")).tag("top")
+                    ForEach(HUD.positions(S), id: \.0) { Text($0.1).tag($0.0) }
                 }
             }
             Section(S.t("키우기", "Learning")) {
@@ -425,6 +425,7 @@ struct SettingsView: View {
         .onChange(of: m.hudPosition) { v in
             m.save()
             NotificationCenter.default.post(name: Notification.Name("MacButlerHUDPosition"), object: v)
+            NotificationCenter.default.post(name: Notification.Name("MacButlerHUDDemo"), object: nil)       // show the card there for a moment
         }
         .frame(width: 580, height: height)
         .padding(.bottom, 8)

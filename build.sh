@@ -22,6 +22,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0"><dict>
 <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
 <key>CFBundleName</key><string>$APP_NAME</string>
+<key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundleDisplayName</key><string>Sasarisa</string>
 <key>CFBundleExecutable</key><string>$APP_NAME</string>
 <key>CFBundlePackageType</key><string>APPL</string>
@@ -44,6 +45,7 @@ swiftc -O Tools/butler.swift -o "$APP/Contents/Resources/bin/butler"
 swiftc -O Tools/mcp.swift -o "$APP/Contents/Resources/bin/butler-mcp"
 cp Tools/jclick Tools/jtype "$APP/Contents/Resources/bin/"
 cp -R Resources/prompts "$APP/Contents/Resources/"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/"     # the orb-and-rings icon (10/25: System Settings showed a blank one)
 if [[ "$SIGN_ID" == Developer\ ID* ]]; then
   # Release signing: hardened runtime + entitlements (needed for notarization)
   for t in "$APP"/Contents/Resources/bin/*; do codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$t" >/dev/null; done
