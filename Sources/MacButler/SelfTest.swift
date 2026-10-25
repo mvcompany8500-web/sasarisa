@@ -207,7 +207,7 @@ enum SelfTest {
             checkBool("window: 잡일", ClaudeRelay.clearBest("잡일", titles: wins) == 4)
             checkBool("window: 음성 제어 맥 설정", ClaudeRelay.clearBest("음성 제어 맥 설정", titles: wins) == 0)
             checkBool("window: 터틀메이커 alone is a close call (model decides)", ClaudeRelay.clearBest("터틀메이커", titles: wins) == nil)
-            checkBool("quote stays as said", ClaudeRelay.isQuote("클로드에 테스트라고 전달해", message: "테스트"))
+            checkBool("as said only when asked (10/25)", ClaudeRelay.isQuote("클로드에 이거 그대로 전달해", message: "이거") && !ClaudeRelay.isQuote("클로드에 버그 고치라고 전달해", message: "버그 고치라고"))
             checkBool("tidy-up that guesses is refused", ClaudeRelay.invented("지금 방금 얘기했던 거 버그 입력한 거 들어가서 고치라고 해", "지금 방금 이야기한 버그를 버그 입력 페이지에 등록한 내용을 들어가서 고쳐 주세요.") > 2)
             checkBool("spelling fixes are fine", ClaudeRelay.invented("어 그 썸네일 그거 다시 만들고 끝나면 텔레그렘으로 보내라고", "그 썸네일 다시 만들고, 끝나면 텔레그램으로 보내 주세요.") <= 2)
             checkBool("문이 → 문의 is fine", ClaudeRelay.invented("크몽 들어가서 문이 있는 거 확인하라 그래", "크몽 들어가서 문의가 있는지 확인해 주세요.") <= 2)
