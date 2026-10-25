@@ -82,7 +82,7 @@ enum DemoFrames {
             NSAttributedString(string: quoted ? "「\(caption)」" : caption, attributes: attrs).draw(in: NSRect(x: 64, y: H - 150, width: W - 120, height: 64))
         } else {
             let t: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 40, weight: .bold), .foregroundColor: NSColor.white]
-            NSAttributedString(string: "사사리사 — 이름을 부르면 맥이 움직여요", attributes: t).draw(at: NSPoint(x: 72, y: H - 110))
+            NSAttributedString(string: "사사리사 — 말로 시키는 AI 비서", attributes: t).draw(at: NSPoint(x: 72, y: H - 110))
         }
         // the HUD, bottom-right, scaled to fit
         let scale = min(1.0, (W * 0.72) / size.width)
