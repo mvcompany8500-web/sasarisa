@@ -6,7 +6,7 @@ import AppKit
 enum DemoFrames {
     struct Scene { let said: String; let state: String; let body: String; let color: NSColor; let window: String; var lead = "말하면"; var quoted = true }
     static let scenes: [Scene] = [
-        Scene(said: "사사리사, 유튜브 로파이 틀어", state: "▶ 유튜브 재생", body: "lofi hip hop radio 📚 beats to relax/study to", color: lime, window: "▶︎  YouTube"),
+        Scene(said: "사사리사, 유튜브 로파이 틀어", state: "▶ 유튜브 재생", body: "비 오는 밤, 공부할 때 듣는 로파이 라디오 ☔", color: lime, window: "▶︎  YouTube"),
         Scene(said: "소리 30으로 해", state: "✓ 소리", body: "30", color: lime, window: "소리 30"),
         Scene(said: "라면 3분", state: "✓ 타이머", body: "라면 · 3분 뒤에 알려 드릴게요", color: lime, window: "3:00"),
         Scene(said: "이거 존댓말로 바꿔", state: "✓ 바꿈 (⌘Z 되돌리기)", body: "내일 미팅은 취소하겠습니다. 죄송합니다.", color: lime, window: "낼 미팅 취소할게 미안\n→ 내일 미팅은 취소하겠습니다. 죄송합니다."),

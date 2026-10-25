@@ -2,16 +2,17 @@
 
 # ◉ Sasarisa
 
-**Say “Sasarisa.” Your Mac does it.** (사사리사 — formerly *Mac Butler*; settings, memory and links carry over)
+**The AI assistant you just talk to. Name it, and your Mac does it.** (사사리사 — formerly *Mac Butler*; settings, memory and links carry over)
 
-<img src="docs/hero.png" width="820" alt="Talk to your Mac and it just does it — YouTube, timers, rewriting text, handing work to Claude Code">
-
-<img src="docs/demo.gif" width="760" alt="The real on-screen orb and card: say it, it happens; it pauses by itself during calls or Handy dictation">
+<p><img src="docs/hero.png" width="820" alt="Talk to your Mac and it just does it — YouTube, timers, rewriting text, handing coding to your AI"></p>
+<br>
+<p><img src="docs/demo.gif" width="820" alt="The real on-screen orb and card: say it, it happens; it pauses by itself during calls or Handy dictation"></p>
+<br>
 
 **From “play some lofi” to “fix the login bug” — just say it.**
-Small chores happen on your Mac in a second; real coding goes to Claude Code. Voice coding, all the way.
+Small chores happen on your Mac in a second; real coding goes to the AI you use — Claude Code, Codex, Aside, an API key or a free local model. Voice coding, all the way.
 
-**No API key — uses your Claude plan** · **Audio never leaves your Mac** · **Asks before deleting, sending or paying**
+**No API key needed — uses the Claude or ChatGPT plan you have** · **Audio never leaves your Mac** · **Asks before deleting, sending or paying**
 
 **[sasarisa.com](https://sasarisa.com/en/)** · [한국어](README.ko.md)
 
