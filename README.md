@@ -4,9 +4,9 @@
 
 **The AI assistant you just talk to. Name it, and your Mac does it.** (사사리사 — formerly *Mac Butler*; settings, memory and links carry over)
 
-<p><img src="docs/hero.png" width="820" alt="Talk to your Mac and it just does it — YouTube, timers, rewriting text, handing coding to your AI"></p>
+<p><img src="docs/hero-en.png" width="820" alt="Talk to your Mac and it just does it — YouTube, timers, rewriting text, handing coding to your AI"></p>
 <br>
-<p><img src="docs/demo.gif" width="820" alt="The real on-screen orb and card: say it, it happens; it pauses by itself during calls or Handy dictation"></p>
+<p><img src="docs/demo-en.gif" width="820" alt="The real on-screen orb and card: say it, it happens; it pauses by itself during calls or Handy dictation"></p>
 <br>
 
 **From “play some lofi” to “fix the login bug” — just say it.**

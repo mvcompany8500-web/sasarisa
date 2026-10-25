@@ -5,6 +5,18 @@ import AppKit
 
 enum DemoFrames {
     struct Scene { let said: String; let state: String; let body: String; let color: NSColor; let window: String; var lead = "말하면"; var quoted = true }
+    /// English README demo (10/25 owner: 「깃허브 영어로 해놔야 하는 거 아녀?」) — `--demo-frames <dir> en`.
+    static let scenesEN: [Scene] = [
+        Scene(said: "Sasarisa, play some lofi on YouTube", state: "▶ Playing on YouTube", body: "Rainy-night lofi radio for studying ☔", color: lime, window: "▶︎  YouTube", lead: "Say"),
+        Scene(said: "Volume to 30", state: "✓ Volume", body: "30", color: lime, window: "Volume 30", lead: "Say"),
+        Scene(said: "Three-minute timer", state: "✓ Timer", body: "I'll tell you in 3 minutes", color: lime, window: "3:00", lead: "Say"),
+        Scene(said: "Make this more polite", state: "✓ Rewritten (⌘Z undoes)", body: "I'm sorry, I'll have to cancel tomorrow's meeting.", color: lime,
+              window: "can't do tmrw mtg sry\n→ I'm sorry, I'll have to cancel tomorrow's meeting.", lead: "Say"),
+        Scene(said: "Lofi on, volume down, screen off", state: "◉ Doing them in order", body: "play lofi → volume down → screen off", color: amber, window: "play → volume ↓ → screen off", lead: "Say"),
+        Scene(said: "Tell Claude to fix the login bug", state: "✓ Sent to Claude", body: "Please fix the login bug.", color: lime, window: "Claude Code\n> Please fix the login bug.", lead: "Say"),
+        Scene(said: "Sasarisa pauses by itself", state: "🎙 On a call · paused", body: "Back when it's over (the hotkey still works)", color: amber,
+              window: "Handy · Zoom · FaceTime", lead: "When Handy or Zoom uses the mic", quoted: false),
+    ]
     static let scenes: [Scene] = [
         Scene(said: "사사리사, 유튜브 로파이 틀어", state: "▶ 유튜브 재생", body: "비 오는 밤, 공부할 때 듣는 로파이 라디오 ☔", color: lime, window: "▶︎  YouTube"),
         Scene(said: "소리 30으로 해", state: "✓ 소리", body: "30", color: lime, window: "소리 30"),
@@ -16,7 +28,8 @@ enum DemoFrames {
               window: "Handy · Zoom · FaceTime", lead: "핸디나 줌이 마이크를 쓰면", quoted: false),
     ]
 
-    static func run(_ dir: String) {
+    static func run(_ dir: String, en: Bool = false) {
+        english = en
         _ = NSApplication.shared
         HUD.offscreen = true
         try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
@@ -29,14 +42,15 @@ enum DemoFrames {
             if let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) { try? png.write(to: url) }
         }
         hud.idle(); frame("")
-        for s in scenes {
-            if s.quoted { hud.show("● 듣는 중", "…", heard: s.said, color: cyan) } else { hud.idle() }
+        for s in en ? scenesEN : scenes {
+            if s.quoted { hud.show(en ? "● Listening" : "● 듣는 중", "…", heard: s.said, color: cyan) } else { hud.idle() }
             frame(s.said, lead: s.lead, quoted: s.quoted)
             hud.show(s.state, s.body, heard: s.quoted ? s.said : "", color: s.color); frame(s.said, s.window, lead: s.lead, quoted: s.quoted)
         }
         print("\(n) frames → \(dir)")
     }
 
+    static var english = false
     /// 1280×720: a quiet desktop, the spoken sentence on top, the real HUD in the bottom-right corner.
     static func compose(hud: HUD, caption: String, window: String = "", lead: String = "말하면", quoted: Bool = true) -> NSImage? {
         guard let root = hud.root else { return nil }
@@ -79,10 +93,10 @@ enum DemoFrames {
             let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 44, weight: .bold), .foregroundColor: NSColor.white, .paragraphStyle: p]
             let mic: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 22, weight: .semibold), .foregroundColor: cyan]
             NSAttributedString(string: lead, attributes: mic).draw(at: NSPoint(x: 72, y: H - 82))
-            NSAttributedString(string: quoted ? "「\(caption)」" : caption, attributes: attrs).draw(in: NSRect(x: 64, y: H - 150, width: W - 120, height: 64))
+            NSAttributedString(string: quoted ? (english ? "“\(caption)”" : "「\(caption)」") : caption, attributes: attrs).draw(in: NSRect(x: 64, y: H - 150, width: W - 120, height: 64))
         } else {
             let t: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 40, weight: .bold), .foregroundColor: NSColor.white]
-            NSAttributedString(string: "사사리사 — 말로 시키는 AI 비서", attributes: t).draw(at: NSPoint(x: 72, y: H - 110))
+            NSAttributedString(string: english ? "Sasarisa — the AI assistant you just talk to" : "사사리사 — 말로 시키는 AI 비서", attributes: t).draw(at: NSPoint(x: 72, y: H - 110))
         }
         // the HUD, bottom-right, scaled to fit
         let scale = min(1.0, (W * 0.72) / size.width)

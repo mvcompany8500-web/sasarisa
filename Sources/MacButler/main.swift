@@ -170,7 +170,7 @@ if let i = CommandLine.arguments.firstIndex(of: "--route"), CommandLine.argument
 // `MacButler --misses` — sentences that went to Claude, grouped by verb (which quick rules to add next).
 if CommandLine.arguments.contains("--misses") { print(Growth.missReport()); exit(0) }
 // `MacButler --demo-frames <dir>` renders the README demo frames from the real HUD (see docs/make-demo.sh).
-if let i = CommandLine.arguments.firstIndex(of: "--demo-frames"), CommandLine.arguments.count > i + 1 { DemoFrames.run(CommandLine.arguments[i + 1]); exit(0) }
+if let i = CommandLine.arguments.firstIndex(of: "--demo-frames"), CommandLine.arguments.count > i + 1 { DemoFrames.run(CommandLine.arguments[i + 1], en: CommandLine.arguments.dropFirst(i + 2).first == "en"); exit(0) }
 // `MacButler --selftest` checks the command grammar without a microphone.
 // `MacButler --settings-shot out.png` — the settings window drawn off screen, full height (to check the design).
 if let i = CommandLine.arguments.firstIndex(of: "--settings-shot"), CommandLine.arguments.count > i + 1 { SettingsWindow.shot(CommandLine.arguments[i + 1]); exit(0) }
