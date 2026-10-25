@@ -331,7 +331,7 @@ final class Butler {
             guard let self, let tr else { return }
             Sound.named(self.cfg.chime)
             self.trainCard(tr, heard: heard)
-            post(["n": n, "heard": heard])
+            post(["n": n, "heard": heard, "next": n < tr.total ? tr.prompt(n, shownName: self.cfg.ko ? (Config.hangulReading(tr.name) ?? tr.name) : tr.name) : ""])
         }
         tr.onDone = { [weak self, weak tr] r in
             guard let self, let tr else { return }
@@ -344,11 +344,13 @@ final class Butler {
         trainer = tr
         log("name training started: \(name)")
         trainCard(tr, heard: "")
+        post(["n": 0, "heard": "", "next": tr.prompt(0, shownName: cfg.ko ? (Config.hangulReading(tr.name) ?? tr.name) : tr.name)])
     }
     private func trainCard(_ tr: NameTrainer, heard: String) {
         let shown = cfg.ko ? (Config.hangulReading(tr.name) ?? tr.name) : tr.name
-        hud.show(S.t("🎙 이름 맞추기 · \(min(tr.samples.count + 1, tr.total))/\(tr.total)", "🎙 Name check · \(min(tr.samples.count + 1, tr.total))/\(tr.total)"),
-                 S.t("「\(shown)」라고 한 번 불러 주세요", "Say “\(shown)” once"), heard: heard, color: cyan)
+        let n = min(tr.samples.count, tr.total - 1), say = tr.prompt(n, shownName: shown)
+        hud.show(S.t("🎙 목소리 맞추기 · \(n + 1)/\(tr.total)", "🎙 Voice check · \(n + 1)/\(tr.total)"),
+                 S.t("「\(say)」라고 말해 주세요", "Say “\(say)”"), heard: heard, color: cyan)
     }
 
     /// Apple's text is shown instantly; the command itself uses Whisper's more accurate text.

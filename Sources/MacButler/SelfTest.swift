@@ -109,6 +109,13 @@ enum SelfTest {
         checkBool("learned spelling wakes", Parser(cfg: momo).stripWake("뭐뭐 몇 시야") == "몇 시야")
         checkBool("learned spelling only for its name", !Config().wakes.contains("뭐뭐"))
         checkBool("sounds close", NameTrainer.close("사사리싸", "사사리사") && !NameTrainer.close("오늘 날씨", "사사리사"))
+        checkBool("8 name takes then 4 with a command", tr.command(0) == "" && tr.command(7) == "" && tr.command(8) == "유튜브 틀어" && tr.prompt(9, shownName: "모모") == "모모, 소리 줄여")
+        checkBool("name part of a command take", NameTrainer.withoutCommand("서서 있어 유튜브 틀어", "유튜브 틀어") == "서서 있어" && NameTrainer.withoutCommand("유튜브 틀어", "유튜브 틀어") == nil && NameTrainer.withoutCommand("뭐뭐 소리 키워", "소리 줄여") == nil)
+        let tr2 = NameTrainer(name: "모모", base: momo, whisper: nil)
+        tr2.samples = ["보보 유튜브 틀어", "보보 소리 줄여"].enumerated().map { NameTrainer.Sample(apple: $1, whisper: $1, raw: "", command: tr2.command($0 + 8)) }
+        checkBool("learns from command takes", tr2.result().learned.contains("보보"))
+        var hangulName = Config(); hangulName.language = "ko"; hangulName.assistantName = "사사리사"
+        checkBool("a name typed in Hangul gets its sound-alikes", hangulName.wakes.contains("싸싸리싸") && Parser(cfg: hangulName).stripWake("서 서 있어 몇 시야") == "몇 시야")
         let np = Parser(cfg: named)
         checkBool("default name 사사리사", Config().assistantName == "Sasarisa" && pk.stripWake("사사리사, 크롬 열어") == "크롬 열어" && pk.stripWake("자비스, 크롬 열어") == "크롬 열어")
         checkBool("샤샤 리사 wakes", np.stripWake("샤샤 리사 유튜브 로파이 틀어") == "유튜브 로파이 틀어")

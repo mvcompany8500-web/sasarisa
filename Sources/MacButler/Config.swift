@@ -122,7 +122,8 @@ struct Config: Codable {
         var own: [String] = []
         if !name.isEmpty, name.lowercased() != "jarvis", name != "자비스" {
             own = [name, (ko ? "헤이 " : "hey ") + name]
-            if ko, let h = Config.hangulReading(name) {
+            // a name typed in Hangul (사사리사) gets the same treatment as its Latin spelling (sasarisa)
+            if ko, let h = Config.hangulReading(name) ?? (name.unicodeScalars.allSatisfy { $0.value >= 0xAC00 && $0.value < 0xD7A4 } ? name : nil) {
                 // what Korean speech recognition writes for it (10/24: 「사사리사」 came back as 「샤샤 리사」)
                 let tense = h.replacingOccurrences(of: "사", with: "싸")       // how it's said out loud: 싸싸리싸
                 own += [h, "헤이 " + h] + (tense != h ? [tense] : []) + (Config.heardAs[h] ?? [])      // sound-alikes (샤싸 리사, 사사니사 …) are matched by `Parser.nameSoundsLike`

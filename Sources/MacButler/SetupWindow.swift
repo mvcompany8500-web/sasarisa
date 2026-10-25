@@ -19,13 +19,25 @@ final class SetupModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     @Published var naturalVoice = false        // a Premium / Enhanced voice (or ElevenLabs) is in use
     @Published var progress: Double = -1          // -1 = not downloading
     @Published var downloadError = ""
+    /// 1단계: what you call it, what it calls you, and the voice check (owner 10/25: 「처음 깔면 호칭을 먼저 정하게 — siri 처럼」).
+    @Published var name: String { didSet { save("assistantName", name, was: oldValue) } }
+    @Published var userName: String { didSet { save("userName", userName, was: oldValue) } }
+    let voiceCheck = NameTrainingModel()
+    var changed = false                 // name/호칭 changed or the voice check ran → restart when setup closes
+    private func save(_ key: String, _ value: String, was: String) {
+        let v = value.trimmingCharacters(in: .whitespaces)
+        guard v != was.trimmingCharacters(in: .whitespaces), key == "userName" || !v.isEmpty else { return }
+        Config.set(key, v); changed = true
+    }
     private var timer: Timer?
     static let modelURL = URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo-q8_0.bin")!
     static let modelSHA = "317eb69c11673c9de1e1f0d459b253999804ec71ac4c23c17ecf5fbe24e259a1"
 
     init(cfg: Config) {
         self.cfg = cfg
+        name = cfg.displayName; userName = cfg.userName
         super.init()
+        voiceCheck.onDone = { [weak self] in self?.changed = true }
         refresh()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
     }
@@ -100,6 +112,20 @@ struct SetupView: View {
             Text(S.t("빨간 것만 해결하면 됩니다. 소리는 맥 밖으로 나가지 않아요.", "Fix anything red. Your audio never leaves this Mac."))
                 .foregroundStyle(.secondary)
             GroupBox {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(S.t("비서 이름 정하기", "Name your assistant")).font(.headline)
+                    HStack {
+                        Text(S.t("부르는 이름", "Its name")).frame(width: 110, alignment: .leading)
+                        TextField(S.t("예: 사사리사", "e.g. Sasarisa"), text: $m.name).textFieldStyle(.roundedBorder)
+                    }
+                    HStack {
+                        Text(S.t("나를 부르는 호칭", "What it calls you")).frame(width: 110, alignment: .leading)
+                        TextField(S.t("예: 대표님 (선택)", "e.g. Tony (optional)"), text: $m.userName).textFieldStyle(.roundedBorder)
+                    }
+                    NameTrainingRow(t: m.voiceCheck, name: m.name, S: S, enabled: m.mic && m.speech)
+                }.padding(6)
+            }
+            GroupBox {
                 VStack(alignment: .leading) {
                     row(m.mic, S.t("마이크", "Microphone"), S.t("부르는 말을 듣기 위해", "To hear the wake word")) {
                         Button(S.t("허용", "Allow")) { AVCaptureDevice.requestAccess(for: .audio) { _ in }; m.openPane("Privacy_Microphone") }
@@ -139,7 +165,7 @@ struct SetupView: View {
                 }
             }
             HStack {
-                Text(S.t("다 되면 「\(m.cfg.displayName)」라고 불러 보세요 — 또는 오른쪽 ⌥ 를 누른 채 말하기.", "Then say “\(m.cfg.displayName.capitalized)” — or hold right ⌥ and talk."))
+                Text(S.t("다 되면 「\(m.name.isEmpty ? m.cfg.displayName : m.name)」라고 불러 보세요 — 또는 오른쪽 ⌥ 를 누른 채 말하기.", "Then say “\((m.name.isEmpty ? m.cfg.displayName : m.name).capitalized)” — or hold right ⌥ and talk."))
                     .font(.callout)
                 Spacer()
                 Button(m.allRequired ? S.t("시작", "Start") : S.t("나중에", "Later")) { onDone() }.keyboardShortcut(.defaultAction)
@@ -176,9 +202,12 @@ enum SetupWindow {
     static func show(cfg: Config) {
         if let w = window { w.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); return }
         let S = Strings(ko: cfg.ko, name: cfg.displayName)
-        let view = SetupView(m: SetupModel(cfg: cfg), S: S) {
+        let model = SetupModel(cfg: cfg)
+        let view = SetupView(m: model, S: S) {
             FileManager.default.createFile(atPath: flag.path, contents: Data())
+            if model.voiceCheck.training { model.voiceCheck.stop() }
             window?.close()
+            if model.changed { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { SettingsWindow.relaunch() } }      // the new name / learned voice take effect
         }
         let w = NSWindow(contentViewController: NSHostingController(rootView: view))
         w.title = "Sasarisa"

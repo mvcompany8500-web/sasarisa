@@ -1,13 +1,14 @@
 // 이름 맞추기 (owner 10/24: 「원하는 비서를 만들면 맥이 바로 움직여요 … 음성으로 10번이나 15번 정도 주인의 음성을 인식하는
 // 테스트를 먼저 … 음성 인식 테스트 해가지고 원하는 비서의 이름을 정하세요」).
-// The owner says the name they want 12 times. Each time we keep what Apple's live recognizer and Whisper wrote. Whatever
+// The owner says the name they want 12 times — 8 times alone, then 4 times with a short command after it, the way it's
+// really used (10/25 owner: 「처음 깔면 호칭을 먼저 정하고, 10번 정도 따라 부르게 해서 그 사람 컴퓨터에 맞게 — siri 처럼」). Each time we keep what Apple's live recognizer and Whisper wrote. Whatever
 // they wrote when it wasn't recognized as the name — and that sounds like it, or came back the same way twice — is
 // learned as another way this Mac hears the name (Config.learnedWakes[name]). The result says how often it was
 // recognized before and after, and suggests another name when it's still poor. Text only is kept; no audio.
 import Foundation
 
 final class NameTrainer {
-    struct Sample: Codable { let apple: String; let whisper: String; let raw: String }
+    struct Sample: Codable { let apple: String; let whisper: String; let raw: String; var command = "" }   // command: what followed the name, if asked
     struct Result { let name: String; let total: Int; let before: Int; let after: Int; let learned: [String] }
 
     let name: String
@@ -23,6 +24,16 @@ final class NameTrainer {
         self.name = name.trimmingCharacters(in: .whitespaces); self.base = base; self.whisper = whisper
     }
     var finished: Bool { samples.count >= total }
+    /// Take n (0-based): the name alone for the first 8, then the name and a short command.
+    func command(_ n: Int) -> String {
+        let cmds = base.ko ? ["유튜브 틀어", "소리 줄여", "지금 몇 시야", "타이머 3분"] : ["play some music", "turn it down", "what time is it", "set a timer"]
+        return n < total - cmds.count ? "" : cmds[(n - (total - cmds.count)) % cmds.count]
+    }
+    /// What the card asks the owner to say for take n.
+    func prompt(_ n: Int, shownName: String) -> String {
+        let c = command(n)
+        return c.isEmpty ? shownName : shownName + (base.ko ? ", " : ", ") + c
+    }
 
     /// One take: Apple's text now, Whisper's when it's done (Whisper hears made-up names better).
     func take(_ apple: String, _ audio: [Float]) {
@@ -31,7 +42,7 @@ final class NameTrainer {
         busy = true
         let finish = { [weak self] (full: String, raw: String) in
             guard let self else { return }
-            self.samples.append(Sample(apple: apple, whisper: full, raw: raw))
+            self.samples.append(Sample(apple: apple, whisper: full, raw: raw, command: self.command(self.samples.count)))
             self.busy = false
             let shown = [full, apple].first { !Parser.squash($0).isEmpty } ?? ""
             self.onProgress(self.samples.count, shown)
@@ -57,7 +68,8 @@ final class NameTrainer {
         let minLen = max(2, min(3, Parser.squash(target).count))      // a 2-syllable name is misheard as 2 syllables too
         var seen: [String: Int] = [:]
         for s in samples where !NameTrainer.hits(p0, s) {
-            for t in Set([s.apple, s.whisper].map(NameTrainer.norm)) where NameTrainer.usable(t, parser: p0, minLen: minLen) { seen[t, default: 0] += 1 }
+            let said = [s.apple, s.whisper].map(NameTrainer.norm).compactMap { NameTrainer.withoutCommand($0, s.command) }
+            for t in Set(said) where NameTrainer.usable(t, parser: p0, minLen: minLen) { seen[t, default: 0] += 1 }
         }
         // 3+ letters: came back the same way twice, or sounds like the name. Shorter: both (short words wake by accident easily).
         let new = seen.filter { k, n in Parser.squash(k).count >= 3 ? (n >= 2 || NameTrainer.close(k, target)) : (n >= 2 && NameTrainer.close(k, target)) }.map(\.key)
@@ -74,7 +86,7 @@ final class NameTrainer {
         Config.set("learnedWakes", all)
         let url = Paths.home.appendingPathComponent("name-training.json")
         let rec: [String: Any] = ["name": r.name, "at": ISO8601DateFormatter().string(from: Date()), "before": r.before, "after": r.after, "total": r.total,
-                                  "learned": r.learned, "takes": samples.map { ["apple": $0.apple, "whisper": $0.whisper, "raw": $0.raw] }]
+                                  "learned": r.learned, "takes": samples.map { ["apple": $0.apple, "whisper": $0.whisper, "raw": $0.raw, "command": $0.command] }]
         if let d = try? JSONSerialization.data(withJSONObject: rec, options: [.prettyPrinted, .sortedKeys]) { try? d.write(to: url) }
         log("name training \(r.name): \(r.before)/\(r.total) → \(r.after)/\(r.total), learned \(r.learned)")
     }
@@ -84,6 +96,15 @@ final class NameTrainer {
     static func norm(_ s: String) -> String {
         Parser.clean(s.replacingOccurrences(of: "[~∼〜!?.,]+", with: " ", options: .regularExpression))
             .lowercased().split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+    /// The part before the command (「서서 있어 유튜브 틀어」 → 「서서 있어」); nil when the command isn't clearly there.
+    static func withoutCommand(_ t: String, _ command: String) -> String? {
+        if command.isEmpty { return t }
+        let all = Parser.squash(t), cmd = Parser.squash(command)
+        guard all.hasSuffix(cmd), all.count > cmd.count else { return nil }
+        var keep = all.count - cmd.count, out = ""
+        for ch in t { if keep == 0 { break }; out.append(ch); if ch.isLetter || ch.isNumber { keep -= 1 } }
+        return norm(out)
     }
     /// Not too short (common words like 「네」 would wake it all day), not too long, and not a command of its own.
     static func usable(_ t: String, parser: Parser, minLen: Int = 3) -> Bool {
