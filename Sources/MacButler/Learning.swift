@@ -76,8 +76,8 @@ enum Learning {
             env["MACBUTLER_SAFE"] = "1"; env["MACBUTLER_BUNDLE"] = Bundle.main.bundleIdentifier ?? ""
             p.environment = env
             p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
-            do { try p.run(); p.waitUntilExit() } catch { return false }
-            if p.terminationStatus != 0 { return false }
+            do { try p.run(); p.waitUntilExit() } catch { log("learned replay couldn't start \(s.joined(separator: " "))"); return false }
+            if p.terminationStatus != 0 { log("learned replay failed at 「\(s.dropFirst().joined(separator: " "))」 (exit \(p.terminationStatus)) → asking the brain to redo and relearn"); return false }
             Thread.sleep(forTimeInterval: 0.25)
         }
         return true

@@ -120,6 +120,13 @@ final class Butler {
         // Pro — 폰으로 부르기: only while linked to a TurtleMaker account (the server says no to non-members)
         if cfg.proRemote, ProAccount.token != nil { ProAccount.startRemote { [weak self] text, id in self?.runRemote(text, id) } }
         listenForSignals()
+        // Always listening: how much memory and CPU it takes, once an hour (to check a whole day of use — 10/25)
+        var lastCPU = (Butler.cpuSeconds(), Date())
+        Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
+            let now = Butler.cpuSeconds(), dt = max(1, Date().timeIntervalSince(lastCPU.1))
+            log(String(format: "resources: memory %.0f MB · cpu %.1f%% over the last hour", Butler.memoryMB(), (now - lastCPU.0) / dt * 100))
+            lastCPU = (now, Date())
+        }
         // Voice with no text at all (quiet, far away) may still be the name — Whisper listens to it once
         ear.onSilentSpeech = { [weak self] audio in
             if let tr = self?.trainer { tr.take("", audio); return }
@@ -889,11 +896,16 @@ final class Butler {
                     win = wins[i]; raise(win, titles[i])
                 } else {
                     log("claude window not found: \(target) among \(titles)")
-                    DispatchQueue.main.async { self.fail(self.S.t("「\(target)」 클로드 창을 못 찾았어요", "Couldn't find the “\(target)” Claude window")) }
+                    DispatchQueue.main.async { self.keepForPaste(message); self.fail(self.S.t("「\(target)」 클로드 창을 못 찾았어요. 전할 말은 복사해 뒀으니 그 창에 ⌘V 로 붙여 넣으세요.", "Couldn't find the “\(target)” Claude window. The message is copied — paste it there with ⌘V.")) }
                     return
                 }
             }
-            guard let box = AX.composer(win) else { DispatchQueue.main.async { self.fail(self.S.claudeNoInput) }; return }
+            // The Claude app's screen may change in an update — then the words aren't lost: they wait on the clipboard.
+            guard let box = AX.composer(win) else {
+                log("claude input box not found in \((AX.attr(win, "AXTitle") as? String) ?? "?") — Claude app layout changed?")
+                DispatchQueue.main.async { self.keepForPaste(message); self.fail(self.S.claudeNoInput + self.S.t(" 전할 말은 복사해 뒀어요(⌘V).", " The message is copied (⌘V).")) }
+                return
+            }
             if composing.wait(timeout: .now() + 0.05) == .timedOut {
                 DispatchQueue.main.async { self.hud.show(self.S.t("◌ 전할 말 다듬는 중", "◌ Tidying the message"), message, heard: nil, color: amber, speed: 3) }
                 _ = composing.wait(timeout: .now() + 20)
@@ -1147,6 +1159,18 @@ final class Butler {
     }
 
     func fail(_ why: String) { speak(why) { [weak self] in self?.converse(keep: true) } }
+    static func cpuSeconds() -> Double {
+        var r = rusage(); getrusage(RUSAGE_SELF, &r)
+        return Double(r.ru_utime.tv_sec + r.ru_stime.tv_sec) + Double(r.ru_utime.tv_usec + r.ru_stime.tv_usec) / 1e6
+    }
+    /// Memory as Activity Monitor shows it (physical footprint).
+    static func memoryMB() -> Double {
+        var info = task_vm_info_data_t(), count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) { $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) } }
+        return kr == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : -1
+    }
+    /// A message that couldn't be delivered stays on the clipboard, so nothing said is lost.
+    func keepForPaste(_ text: String) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string); log("kept on clipboard for pasting: \(text.prefix(80))") }
 
     func dictate(_ t: String) {
         let s = Parser.squash(t)
