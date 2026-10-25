@@ -121,7 +121,7 @@ the free macOS voice reads instead.
 
 Keys go into the **macOS Keychain**, never into `config.json`: paste them in Settings, or
 `Sasarisa.app/Contents/MacOS/Sasarisa --set-key openai` (reads the key from stdin). To check a brain without the
-microphone: `MACBUTLER_HOME=/tmp/mb-test MacButler --ask "지금 몇 시야?"`.
+microphone: `MACBUTLER_HOME=/tmp/mb-test MacButler --ask "what time is it?"`.
 
 ## Install
 
@@ -175,10 +175,10 @@ Everything lives in `~/.macbutler/`:
 ```jsonc
 {
   "language": "ko",                // "ko" or "en"
-  "userName": "대표님",             // how it addresses you
-  "assistantName": "사사리사",
-  "wakeWords": ["사사리사", "헤이 사사리사"],
-  "greetingText": "어서 오십시오, {user}",
+  "userName": "Tony",               // how it addresses you
+  "assistantName": "Sasarisa",
+  "wakeWords": ["sasarisa", "hey sasarisa"],
+  "greetingText": "Welcome home, {user}.",
   "activation": "voice",           // "voice" = wake word + hotkey · "hold" = only while holding the hotkey
   "inputDevice": "",               // microphone UID ("" = system default) — list them: Sasarisa --devices
   "outputDevice": "",              // speaker UID for the voice and sounds
@@ -192,7 +192,7 @@ Everything lives in `~/.macbutler/`:
   "brainModel": "",                // for API brains, e.g. a model name from the provider's list
   "whisperModel": "",              // default ~/.macbutler/models/ggml-large-v3-turbo-q8_0.bin
   "browserApp": "Safari",           // default · "Google Chrome" etc. · "" = your default browser
-  "apps": { "브루": "Vrew" },       // extra spoken app names
+  "apps": { "editor": "Visual Studio Code" },   // extra spoken app names
   "silenceSec": 1.8, "followUpSec": 30
 }
 ```
@@ -232,7 +232,7 @@ Everything lives in `~/.macbutler/`:
 * **It types nothing** — Accessibility is off, or was reset after a rebuild. Remove Sasarisa from the list and add it again.
 * **“Claude Code is not installed”** — run `claude` once in Terminal, or set `"claudePath"` in config.json.
 * **Slow** — check `uptime` / Activity Monitor; heavy builds or renders slow everything down. Whisper only loads after you call it.
-* **Test without a mic** — `~/Applications/Sasarisa.app/Contents/Resources/bin/butler say "크롬 열어"`
+* **Test without a mic** — `~/Applications/Sasarisa.app/Contents/Resources/bin/butler say "open Chrome"`
 * **Grammar self-test** — `~/Applications/Sasarisa.app/Contents/MacOS/Sasarisa --selftest`
 </details>
 
@@ -273,25 +273,11 @@ inspired by [Handy](https://github.com/cjpais/Handy).
 
 ## 한국어
 
-**「유튜브 틀어」부터 「로그인 버그 고쳐」까지, 말하면 됩니다. 입코딩의 끝.**
-
-**맥 버틀러(Sasarisa)** — 늘 듣고 있다가 “Sasarisa” (사사리사)(기본 호출어, 설정에서 바꿀 수 있음) 하고 부르면 말로 맥을 움직이는 비서입니다.
-쉬운 일은 맥이 바로 하고, 코딩 같은 중요한 일은 클로드 코드에 말로 맡깁니다. 키보드도 마우스도 안 씁니다.
-쉬운 일(앱 열기·검색·유튜브·글 입력·받아쓰기)은 1초 안에 직접 하고, 나머지는 클로드 코드가 화면을 보고 처리한 뒤 말로 답합니다.
-「클로드코드한테 ○○ 해서 보내」라고 하면 클로드 앱에 새 세션을 열어 일을 통째로 맡깁니다.
-
-```bash
-git clone https://github.com/mvcompany8500-web/sasarisa.git && cd sasarisa && ./scripts/install.sh
-```
-
-* 메뉴 막대 **◉J** → 상태 점검에서 ✗ 를 누르면 해당 권한 설정이 열립니다.
-* 호칭은 `~/.macbutler/config.json` 의 `"userName"` (예: `"대표님"`), 인사말은 `"greetingText"`.
-* 말하는 중에 말을 걸면 바로 멈추고 듣습니다. 끝낼 땐 「됐어」.
-* 소리는 맥 밖으로 나가지 않습니다. 클로드에게 넘긴 지시 글과(켜 둔 경우) 일레븐랩스 읽기 글만 밖으로 나갑니다.
+한국어 설명은 **[README.ko.md](README.ko.md)** 에 있습니다 · 소개 페이지 [sasarisa.com](https://sasarisa.com/)
 
 ## Made by
 
-**turtle buff ai** — AI로 혼자 일하는 법을 보여 주는 한국 채널.
+**turtle buff ai** — a Korean channel about working solo with AI.
 This project is built and used daily on camera: [YouTube @turtle_buff](https://www.youtube.com/@turtle_buff) · [turtle-buff.com](https://turtle-buff.com)
 
 If it's useful, a ⭐ helps others find it.
