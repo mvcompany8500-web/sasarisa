@@ -68,7 +68,7 @@ final class Ear {
         Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             guard let self, Date().timeIntervalSince(self.lastRestart) > 3 else { return }
             self.lock.lock(); let last = self.lastBuffer; self.lock.unlock()
-            if Date().timeIntervalSince(last) > 3 { log("ear: no audio for 3 s → restarting mic"); self.restartEngine() }
+            if Date().timeIntervalSince(last) > 3, Date() >= self.settleUntil { log("ear: no audio for 3 s → restarting mic"); self.restartEngine() }
             // Voice is coming in but the recognizer has produced nothing for 10 s → it's stuck; start a fresh task.
             if !self.muted, !self.holding, Date().timeIntervalSince(self.lastLoud) < 2, Date().timeIntervalSince(self.lastChange) > 20,
                Date().timeIntervalSince(self.taskStart) > 20 { log("ear: speech but no text for 20 s → restarting recognizer"); self.restart() }
@@ -90,11 +90,31 @@ final class Ear {
             // Our own restart (or picking a device) also fires this — only react if the mic really stopped,
             // and never more than once every 3 s (this used to loop 70 times a minute).
             guard !self.engine.isRunning, Date().timeIntervalSince(self.lastRestart) > 3 else { return }
-            log("ear: audio configuration changed → restarting mic"); self.restartEngine()
+            // Let the other app finish reconfiguring first (OBS + screen recording on the same mic ping-ponged with us, 10/25 17:07)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self, !self.engine.isRunning else { return }
+                log("ear: audio configuration changed → restarting mic"); self.restartEngine()
+            }
         }
     }
     private var retired: [AVAudioEngine] = []
+    private var recentRestarts: [Date] = []
+    private var settleUntil = Date.distantPast
+    private var settleRetry = false
+    /// Several restarts in a row mean another app (OBS, screen recording, a call) keeps changing the mic: back off and let it settle.
     private func restartEngine() {
+        let now = Date()
+        if now < settleUntil {
+            if !settleRetry { settleRetry = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + settleUntil.timeIntervalSince(now) + 0.1) { [weak self] in self?.settleRetry = false; self?.restartEngine() } }
+            return
+        }
+        recentRestarts = recentRestarts.filter { now.timeIntervalSince($0) < 30 } + [now]
+        if recentRestarts.count >= 4 {
+            let wait: TimeInterval = recentRestarts.count >= 8 ? 15 : 8
+            settleUntil = now.addingTimeInterval(wait)
+            log("ear: the mic keeps changing (another app such as OBS or screen recording is using it) → waiting \(Int(wait)) s for it to settle")
+        }
         lastRestart = Date()
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
