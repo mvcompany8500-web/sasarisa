@@ -405,10 +405,16 @@ final class Butler {
         let group = [0: 0, 1: 0, 15: 0, 3: 3, 4: 3, 16: 3, 7: 7, 8: 7, 17: 7, 9: 9, 10: 9, 12: 9, 13: 9, 14: 9]
         return group[c] ?? c
     }
+    /// The browser to act in: the one in front, else the first one running.
+    func browserApp() -> NSRunningApplication? {
+        let ids = ["com.apple.Safari", "com.google.Chrome", "company.thebrowser.Browser", "com.microsoft.edgemac", "com.naver.Whale"]
+        if let f = NSWorkspace.shared.frontmostApplication, let id = f.bundleIdentifier, ids.contains(id) { return f }
+        return ids.lazy.compactMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0).first }.first
+    }
     /// Intents that carry none of the speaker's own words — Apple's live text is enough for them.
     static func noFreeText(_ i: Intent) -> Bool {
         switch i {
-        case .media, .closeTabs, .mediaNext, .displayOff, .closeOpened, .browser, .volume, .clock, .cancelTimers, .undo, .whatDid, .youtubeNth: return true
+        case .media, .closeTabs, .mediaNext, .seek, .mailNth, .displayOff, .closeOpened, .browser, .volume, .clock, .cancelTimers, .undo, .whatDid, .youtubeNth: return true
         case .kakaoReply(_, let text): return text.isEmpty
         default: return false
         }
@@ -491,6 +497,35 @@ final class Butler {
             // (Right after it was talking, "멈춰" was meant for its voice — that's already stopped.)
             if Date().timeIntervalSince(spokeAt) > 3, AudioDevices.outputBusy(cfg.outputDevice, micUID: cfg.inputDevice) == true { media(play: false) } else { converse() }
         case .media(let play): media(play: play)
+        case .seek(let secs):
+            guard let b = browserApp() else { ask(cmd); return }
+            b.activate()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                for i in 0..<max(1, abs(secs) / 10) { DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.08) { Hands.key(secs > 0 ? 37 : 38) } }   // l / j
+            }
+            played(secs > 0 ? S.t("빨리 감기", "Forward") : S.t("되감기", "Back"), "\(abs(secs))" + S.t("초", " s"))
+        case .mailNth(let n):
+            guard let b = browserApp(), let bid = b.bundleIdentifier else { ask(cmd); return }
+            mode = .busy
+            DispatchQueue.global().async { [weak self] in
+                guard let self else { return }
+                b.activate(); Thread.sleep(forTimeInterval: 0.2)
+                var mails: [(AXUIElement, String)] = [], count = 0
+                if let app = AX.app(bid), let win = AX.windows(app).first {
+                    AX.walk(win, count: &count, until: Date().addingTimeInterval(2.5)) { e, role in
+                        guard role == "AXLink" else { return }
+                        let t = [AX.attr(e, "AXTitle"), AX.attr(e, "AXDescription"), AX.attr(e, "AXValue")].compactMap { $0 as? String }.first { !$0.isEmpty } ?? ""
+                        if t.hasPrefix("메일 제목") { mails.append((e, t)) }      // Naver Mail: one 「메일 제목 …」 link per mail
+                    }
+                }
+                DispatchQueue.main.async {
+                    guard n >= 1, n <= mails.count else { log("mailNth: \(mails.count) mails found — brain takes it"); self.mode = .awake; self.ask(cmd); return }
+                    AX.press(mails[n - 1].0)
+                    let title = String(mails[n - 1].1.dropFirst("메일 제목".count)).trimmingCharacters(in: .whitespaces)
+                    log("mailNth \(n): \(title)")
+                    self.done(self.S.t("\(n)번째 메일", "Mail #\(n)"), title)
+                }
+            }
         case .mediaNext:
             Hands.mediaKey(17)            // ⏭ — YouTube skips to the next video
             played(S.t("다음 영상", "Next"), "⏭")

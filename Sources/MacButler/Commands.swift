@@ -8,6 +8,8 @@ enum Intent: Equatable {
     case claude(target: String, message: String, newSession: Bool)
     case youtube(String)          // "" = YouTube home
     case youtubeNth(Int)
+    case seek(Int)                // 「빨리 감기」「30초 되감기」 — seconds, + forward / − back (YouTube's l / j)
+    case mailNth(Int)             // 「네 번째 메일 열어」 — the nth mail in the web mail list in front
     case search(String)
     case web(label: String, query: String, url: String)   // shopping / site search
     case remember(String)                                   // 「기억해: …」 — a long-term note
@@ -194,6 +196,10 @@ struct Parser {
             if before.allSatisfy({ parse($0, hasYouTubeList: hasYouTubeList) != .none }) { return .multi(before + [String(s[k.lowerBound...])]) }
         }
         if Parser.match(Parser.squash(s), "^카(?:카오)?톡(?:방|창)?(?:에서|에)?(?:전송|전속|보내기|엔터)(?:버튼)?(?:좀)?(?:눌러|클릭|쳐)") != nil { return .kakaoReply(to: "", text: "") }
+        // Done here, not by the brain (10/25 filming: 10–15 s each through Codex)
+        if let sk = Parser.seek(s) { return .seek(sk) }
+        if let m = Parser.mailSite(s) { return .web(label: m.0, query: "", url: m.1) }
+        if let m = Parser.match(s, "^(\\S+)\\s*번째\\s*(?:메일|이메일|편지)(?:을|를)?\\s*(?:좀\\s*)?(?:열어|클릭|눌러|들어가|봐|보여|확인)"), let n = Parser.ordinal(m[1]) { return .mailNth(n) }
         if let k = Parser.kakaoReply(s) { return k.2 ? .kakaoReply(to: k.0, text: k.1) : .kakaoType(to: k.0, text: k.1) }
         if let r = Routines.match(s) { return .routine(r) }
         if let st = Parser.rewriteStyle(s) { return .rewrite(st) }
@@ -561,6 +567,26 @@ struct Parser {
         return parts.count >= 2 ? parts : nil
     }
     /// "다음 영상으로 넘겨", "다음 곡", "next video"
+    /// 「빨리 감기 해 줘」「30초 앞으로 넘겨」「되감기」 → +10 / +30 / −10 seconds.
+    static func seek(_ s: String) -> Int? {
+        let q = squash(s)
+        guard q.count <= 22 else { return nil }
+        let fwd = ["빨리감기", "빨리감아", "앞으로감기", "앞으로감아", "앞으로넘겨", "빨리넘겨", "fastforward", "skipahead"]
+        let back = ["되감기", "되감아", "뒤로감기", "뒤로감아", "뒤로넘겨", "rewind"]
+        let sign = fwd.contains(where: q.contains) ? 1 : back.contains(where: q.contains) ? -1 : 0
+        guard sign != 0 else { return nil }
+        var secs = 10
+        if let m = match(q, "(\\d+)초") { secs = Int(m[1]) ?? 10 } else if let m = match(q, "(\\d+)분") { secs = (Int(m[1]) ?? 1) * 60 }
+        return sign * max(5, min(secs, 600))
+    }
+    /// 「네이버 메일 열어」「지메일 들어가자」 → the web mail page.
+    static func mailSite(_ s: String) -> (String, String)? {
+        let q = squash(s)
+        guard q.count <= 22, match(q, "(열어|켜|들어가|가자|보여|띄워|open)") != nil, q.contains("메일") || q.contains("gmail") || q.contains("mail") else { return nil }
+        if q.contains("네이버") || q.contains("naver") { return ("네이버 메일", "https://mail.naver.com") }
+        if q.contains("지메일") || q.contains("gmail") || q.contains("구글") || q.contains("google") { return ("Gmail", "https://mail.google.com") }
+        return nil
+    }
     static func isNext(_ s: String) -> Bool {
         let q = squash(s)
         return q.count <= 16 && (["다음영상", "다음곡", "다음노래", "다음거틀어", "다음걸로", "nextvideo", "nextsong", "skip"].contains(where: q.contains))
