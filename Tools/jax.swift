@@ -279,7 +279,7 @@ func pick(_ q: String, _ idx: Int, _ pool: [(AXUIElement, String, String, CGRect
 func press(_ e: AXUIElement, _ f: CGRect) -> Bool {
     if AXUIElementPerformAction(e, kAXPressAction as CFString) == .success { return true }
     // Only if AXPress is unsupported: click and put the pointer straight back (barely visible)
-    let c = Process(); c.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/cliclick")
+    let c = Process(); c.executableURL = URL(fileURLWithPath: ["/opt/homebrew/bin/cliclick", "/usr/local/bin/cliclick"].first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/opt/homebrew/bin/cliclick")   // Intel Macs: /usr/local
     c.arguments = ["-r", "c:\(Int(f.midX)),\(Int(f.midY))"]; try? c.run(); c.waitUntilExit()
     return true
 }

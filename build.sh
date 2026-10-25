@@ -37,12 +37,26 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 echo "› compiling app"
-swiftc -O -swift-version 5 Sources/MacButler/*.swift -o "$APP/Contents/MacOS/$APP_NAME" \
+# Runs on macOS 14 (Sonoma) and later, on Apple silicon and Intel — without -target, swiftc builds for this Mac's own
+# macOS and chip only (10/26: an M2 on Sonoma couldn't open 0.7.1). ARCHS="arm64" builds just one chip (faster, owner builds).
+MINOS="${MINOS:-14.0}"
+ARCHS="${ARCHS:-arm64 x86_64}"
+# swiftc for each chip, then one universal file
+uni() {
+  local out="$1"; shift
+  local parts=()
+  for a in ${=ARCHS}; do
+    swiftc -O -target "$a-apple-macos$MINOS" "$@" -o "$out.$a"
+    parts+=("$out.$a")
+  done
+  lipo -create "${parts[@]}" -output "$out" && rm -f "${parts[@]}"
+}
+uni "$APP/Contents/MacOS/$APP_NAME" -swift-version 5 Sources/MacButler/*.swift \
   -framework AppKit -framework AVFoundation -framework Speech -framework QuartzCore -framework ApplicationServices -framework SwiftUI
 echo "› compiling tools"
-swiftc -O Tools/jax.swift -o "$APP/Contents/Resources/bin/jax"
-swiftc -O Tools/butler.swift -o "$APP/Contents/Resources/bin/butler"
-swiftc -O Tools/mcp.swift -o "$APP/Contents/Resources/bin/butler-mcp"
+uni "$APP/Contents/Resources/bin/jax" Tools/jax.swift
+uni "$APP/Contents/Resources/bin/butler" Tools/butler.swift
+uni "$APP/Contents/Resources/bin/butler-mcp" Tools/mcp.swift
 cp Tools/jclick Tools/jtype "$APP/Contents/Resources/bin/"
 cp -R Resources/prompts "$APP/Contents/Resources/"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/"     # the orb-and-rings icon (10/25: System Settings showed a blank one)

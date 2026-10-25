@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.7.2 — 2026-10-26 · Runs on macOS 14 Sonoma and Intel Macs, much faster replies
+- **Opens on macOS 14 (Sonoma) and 15 again, and on Intel Macs:** 0.7.1 was built for macOS 27 only, so it wouldn't start on older macOS even though macOS 14 was listed. The app is now one universal file (Apple silicon + Intel) for macOS 14 and later
+- **Much faster after you speak:** commands now go to the front of the transcription queue, and stray sounds (claps, a recording app, people talking) are no longer all transcribed in the background — commands waited 5–26 s behind them. Simple commands (close tabs, back, volume, what time, KakaoTalk send) run on the live text right away
+- **New quick commands, no AI round-trip:** 「빨리 감기」「30초 되감기」 (YouTube), 「네이버 메일 열어」「지메일 들어가자」, 「네 번째 메일 열어」 (Naver Mail), 「카톡 전송 눌러」, and routes like 「서귀포에서 제주시로 가는 길」 open a directions map
+- **KakaoTalk:** 「카톡 창에 △△라고 입력해」 only types △△ (doesn't send); 「…입력해서 엔터까지 쳐」 sends; 「카톡창 열려있잖아. 거기에다가 △△라고 말해」 sends only △△; a command before it (「유튜브 창 다 끄고 카톡에 …」) runs first
+- **A muted mic is shown:** if the mic sends pure silence for 2 minutes (e.g. its mute button is on), a card says so — no sound, in case you're recording
+- **Listens on the mic you chose** even when AirPods or a recording app take over the Mac's default input; restarts calm down instead of looping
+- Fixes: 「뒤로 가서 네 번째 메일 클릭해」 does both; 「땡큐」「피니쉬」 end the conversation; your own channel name (「거북이 버프입니다」) no longer wakes it; the Claude window is found even with its sidebar collapsed; 1–3 letter scraps after the name just listen instead of asking the AI
+
 ## 0.7.1 — 2026-10-25 · Name it like Siri, any AI, combo brain
 - **Name your assistant first, like “Hey Siri”:** the setup window now starts with its name, what it calls you, and a **voice check** — say the name 8 times and with a short command 4 times; it learns how *your* voice comes out on *this* Mac (also in Settings → 목소리로 이름 맞추기). It shows how often it was understood before and after, and suggests another name if it's still poor. A name typed in Hangul gets the same sound-alikes as its Latin spelling
 - **Pick everything in setup:** the brain (installed ones marked ✓), the voice (with a preview) and where the card shows up — choosing a place moves the real card there for a moment. The card now sits **in the middle of the screen** by default (no resting orb there); bottom center (above the Dock), bottom right, bottom left and top center are one click away

@@ -88,7 +88,7 @@ mic ──► Apple on-device speech ──► wake word / live text on the HUD
 
 > **Mac first. Windows comes later** — once wake-word listening and transcription there are as quick as on the Mac.
 
-* macOS 14 or later, Apple Silicon recommended (tested on Mac mini M4, macOS 27)
+* macOS 14 (Sonoma) or later — Apple silicon or Intel (Apple silicon recommended; tested on Mac mini M4)
 * [Claude Code](https://docs.claude.com/en/docs/claude-code/setup) installed and logged in (`claude` in your terminal once). Uses your Claude plan.
 * [Homebrew](https://brew.sh) — the installer adds `whisper-cpp` and `cliclick`
 * ~1 GB disk for the Whisper model (optional but strongly recommended for Korean)
