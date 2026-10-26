@@ -235,6 +235,7 @@ claude mcp add --transport http --scope user higgsfield https://mcp.higgsfield.a
 * **Asks before handing work to a Claude Code session.** Anything the brain wants to hand over waits for your spoken yes, so a TV or a web page can't start work on your computer. ("Right away" mode applies only when you ask for Claude yourself.)
 * **Free mode (Settings, off by default):** only payments ask; sending, posting, deleting and hand-offs to Claude just happen. TV or video audio can sound like a command, so pair it with headphones or the hotkey.
 * **Grow together (chosen on first run, changeable in Settings):** only if you choose it, once a day it shares short sentences it understood and the quick command they ran (volume, video, closing pages, opening apps) with no name. No audio, conversations, screen, files, names or search words. A sentence reaches everyone only when 5+ different installs on 3+ networks use it.
+* **The daily pack download:** every Sasarisa fetches the shared pack once a day (at launch and every 20 hours). Like any app, that request carries the app name, version and macOS version; we only count those requests to know roughly how many Macs run it. No id, name or content.
 * Everything it pressed, typed or opened is logged in `~/.macbutler/logs/actions.log`.
 * Other apps can't send it commands (owner-only control socket). Details and how to report a vulnerability: [SECURITY.md](SECURITY.md).
 * Use the menu toggle to stop listening during calls and meetings.
