@@ -209,6 +209,23 @@ if let i = CommandLine.arguments.firstIndex(of: "--hear"), CommandLine.arguments
     exit(0)
 }
 if CommandLine.arguments.contains("--selftest") { exit(SelfTest.run() ? 0 : 1) }
+// `--hf "<request>"` prints the Higgsfield plan and price (0 credits); add `--make` to also make it once (spends credits).
+if let i = CommandLine.arguments.firstIndex(of: "--hf"), i + 1 < CommandLine.arguments.count {
+    let hf = Higgsfield(cfg: Config.load()), make = CommandLine.arguments.contains("--make")
+    hf.quote(CommandLine.arguments[i + 1]) { r in
+        switch r {
+        case .failure(let e): print("✗ \(e.localizedDescription)"); exit(1)
+        case .success(let plan):
+            print("plan: \(plan.summary) · \(plan.tool) · \(plan.params) · \(plan.credits) credits · balance \(plan.balance.map { String($0) } ?? "?") · unlim \(plan.unlim)")
+            guard make else { exit(0) }
+            hf.generate(plan) { r in
+                switch r { case .failure(let e): print("✗ \(e.localizedDescription)"); exit(1)
+                           case .success(let f): print("saved: \(f.path)"); exit(0) }
+            }
+        }
+    }
+    RunLoop.main.run()
+}
 // `MacButler --parse "말"` shows how a sentence would be understood (for testing the grammar).
 if let i = CommandLine.arguments.firstIndex(of: "--parse") {
     let p = Parser(cfg: Config.load())

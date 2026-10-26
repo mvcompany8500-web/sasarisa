@@ -27,6 +27,31 @@ func butlerSend(_ cmd: String, _ text: String) -> String? {
     return n > 0 ? String(decoding: b[0..<n], as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) : ""
 }
 
+/// butler hf-guard <state.json> — a Claude Code PreToolUse hook for Higgsfield (10/26: credits are money).
+/// Reads the hook's JSON on stdin. A generate_* call with "get_cost": true (price only) always passes. Otherwise only in
+/// "generate" mode, only the approved tool and model, one output, once. Exit 2 = blocked (the reason goes to the AI).
+func hfGuard(_ statePath: String) -> Never {
+    let input = FileHandle.standardInput.readDataToEndOfFile()
+    let hook = (try? JSONSerialization.jsonObject(with: input)) as? [String: Any] ?? [:]
+    let tool = (hook["tool_name"] as? String ?? "").replacingOccurrences(of: "mcp__higgsfield__", with: "")
+    let ti = hook["tool_input"] as? [String: Any] ?? [:]
+    var params = ti["params"] as? [String: Any] ?? [:]
+    if let str = ti["params"] as? String, let d = str.data(using: .utf8), let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] { params = o }
+    func block(_ why: String) -> Never { FileHandle.standardError.write((why + "\n").data(using: .utf8)!); exit(2) }
+    guard tool.hasPrefix("generate_") else { exit(0) }
+    if params["get_cost"] as? Bool == true { exit(0) }
+    let url = URL(fileURLWithPath: statePath)
+    guard let d = try? Data(contentsOf: url), var st = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { block("Blocked: no approved generation. Price it with \"get_cost\": true.") }
+    guard st["mode"] as? String == "generate" else { block("Blocked: price only — add \"get_cost\": true. Nothing may be generated before the user approves the price.") }
+    guard (st["used"] as? Int ?? 0) == 0 else { block("Blocked: the one approved generation was already submitted. Do not retry; report the result or the error.") }
+    guard tool == st["tool"] as? String, params["model"] as? String == st["model"] as? String else { block("Blocked: only \(st["tool"] ?? "") with model \(st["model"] ?? "") was approved.") }
+    guard (params["count"] as? Int ?? 1) == 1 else { block("Blocked: one output only (count 1).") }
+    st["used"] = 1
+    if let out = try? JSONSerialization.data(withJSONObject: st) { try? out.write(to: url) }
+    exit(0)
+}
+if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "hf-guard" { hfGuard(CommandLine.arguments[2]) }
+
 let a = CommandLine.arguments
 guard a.count >= 2, ["say", "type", "delegate", "settings", "session", "setup"].contains(a[1]) else { print("usage: butler <say|type|delegate|settings|session|setup> [text]"); exit(1) }
 guard let answer = butlerSend(a[1], a.dropFirst(2).joined(separator: " ")) else { print("Sasarisa is not running"); exit(2) }

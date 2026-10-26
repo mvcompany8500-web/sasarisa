@@ -487,6 +487,7 @@ final class Butler {
         if askingFreeMode, answerFreeMode(cmd) { return }
         if pendingAction != nil, answerAction(cmd) { return }
         if pendingDelegate != nil, answerPending(cmd) { return }
+        if pendingHF != nil, answerHF(cmd) { return }
         let q = Parser.squash(cmd)
         if learnCandidate != nil, ["아니", "틀렸", "그게아니", "안됐", "잘못", "no", "wrong"].contains(where: { q.hasPrefix($0) }) {
             log("not learning: \(learnCandidate!.phrase)"); learnCandidate = nil
@@ -507,6 +508,7 @@ final class Butler {
             // (Right after it was talking, "멈춰" was meant for its voice — that's already stopped.)
             if Date().timeIntervalSince(spokeAt) > 3, AudioDevices.outputBusy(cfg.outputDevice, micUID: cfg.inputDevice) == true { media(play: false) } else { converse() }
         case .media(let play): media(play: play)
+        case .higgsfield(let req): higgsfield(req)
         case .seek(let secs):
             guard let b = browserApp() else { ask(cmd); return }
             b.activate()
@@ -881,7 +883,7 @@ final class Butler {
     /// Quick commands only — what the router / aliases may trigger.
     func isQuick(_ canon: String) -> Bool {
         switch parser.parse(canon, hasYouTubeList: !ytList.isEmpty) {
-        case .none, .claude, .type, .dictation, .remember, .makeRoutine, .badRoutine, .forgetRoutine, .greet, .bye, .hush, .enter, .rewrite: return false
+        case .none, .claude, .type, .dictation, .remember, .makeRoutine, .badRoutine, .forgetRoutine, .greet, .bye, .hush, .enter, .rewrite, .higgsfield: return false
         default: return true
         }
     }
@@ -1056,6 +1058,63 @@ final class Butler {
         "com.apple.SecurityAgent", "com.apple.UserNotificationCenter", "com.apple.coreservices.uiagent", "com.apple.installer",
         "com.apple.dt.Xcode", "com.apple.Console", "com.anthropic.claudefordesktop", "com.microsoft.VSCode",
         "com.todesktop.230313mzl4w4u92", "dev.zed.Zed", "com.1password.1password", "com.bitwarden.desktop"]
+    // MARK: 힉스필드 — the price first (0 credits), then one generation after 「응」. Credits are money: asked every time, free mode too.
+    lazy var hf = Higgsfield(cfg: cfg)
+    var pendingHF: Higgsfield.Plan?
+    func higgsfield(_ req: String) {
+        guard !hf.busy else { fail(S.t("힉스필드 작업이 아직 진행 중이에요.", "A Higgsfield job is still running.")); return }
+        mode = .busy
+        hud.show(S.t("◌ 힉스필드 · 값 알아보는 중 (크레딧 0)", "◌ Higgsfield · checking the price (0 credits)"), req, heard: nil, color: amber, speed: 2)
+        hf.quote(req) { [weak self] r in
+            guard let self else { return }
+            self.mode = .awake
+            switch r {
+            case .failure(let e): self.fail(e.localizedDescription)
+            case .success(let plan):
+                let n = plan.credits == plan.credits.rounded() ? String(Int(plan.credits)) : String(format: "%.2f", plan.credits)
+                let cost = plan.unlim ? self.S.t("무료 생성", "a free generation") : self.S.t("\(n) 크레딧", "\(n) credits")
+                let left = plan.balance.map { self.S.t(" · 남은 \(Int($0))", " · \(Int($0)) left") } ?? ""
+                log("higgsfield quote: \(plan.summary) · \(cost)\(left) · \(plan.params)")
+                if !plan.unlim, plan.credits > self.cfg.hfMaxCredits {
+                    self.fail(self.S.t("\(plan.summary)은 \(cost)라 한 번 한도 \(Int(self.cfg.hfMaxCredits))를 넘어요. 더 짧거나 싼 걸로 말씀해 주세요.",
+                                       "\(plan.summary) costs \(cost), over the \(Int(self.cfg.hfMaxCredits))-credit limit. Ask for something shorter or cheaper."))
+                    return
+                }
+                self.pendingHF = plan
+                self.speak(self.S.t("\(plan.summary), \(cost)예요. 만들까요?", "\(plan.summary), \(cost). Make it?")) { [weak self] in
+                    guard let self else { return }
+                    self.converse(keep: true)
+                    self.hud.show(self.S.t("◌ 힉스필드 · \(cost)\(left) — 만들까요? 「응」 / 「아니」", "◌ Higgsfield · \(cost)\(left) — make it? “yes” / “no”"), plan.summary, heard: nil, color: amber)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+                        if self?.pendingHF?.request == plan.request { self?.pendingHF = nil; log("higgsfield: no answer — nothing made") }
+                    }
+                }
+            }
+        }
+    }
+    func answerHF(_ a: String) -> Bool {
+        guard let plan = pendingHF else { return false }
+        let s = Parser.squash(a)
+        pendingHF = nil
+        if ["아니", "취소", "하지마", "됐어", "말고", "no", "nope", "cancel", "stop"].contains(where: { s.hasPrefix($0) || s.contains("하지마") }) {
+            Sound.named("Pop"); log("higgsfield: declined — nothing made"); done(S.t("힉스필드", "Higgsfield"), S.t("안 만들었어요 (크레딧 0)", "Not made (0 credits)")); return true
+        }
+        guard ["응", "네", "예", "그래", "좋아", "만들어", "해", "ㅇㅇ", "오케이", "고고", "진행", "yes", "yeah", "ok", "okay", "sure", "doit", "go"].contains(where: { s.hasPrefix($0) }) else {
+            log("higgsfield: no clear yes — nothing made"); return false
+        }
+        log("higgsfield: approved \(plan.summary) · \(plan.credits)")
+        Sound.soft("Tink")
+        done(S.t("힉스필드 · 만드는 중", "Higgsfield · making it"), S.t("\(plan.summary) — 몇 분 걸려요. 다 되면 알려 드릴게요", "\(plan.summary) — takes a few minutes; I'll tell you"))
+        hf.generate(plan) { [weak self] r in
+            guard let self else { return }
+            switch r {
+            case .failure(let e): log("higgsfield: failed \(e.localizedDescription)"); self.hud.show(self.S.t("✗ 힉스필드", "✗ Higgsfield"), e.localizedDescription, heard: nil, color: .systemRed)
+            case .success(let file): Sound.named("Glass"); log("higgsfield: saved \(file.path)"); self.hud.show(self.S.t("✓ 힉스필드 · 저장함", "✓ Higgsfield · saved"), file.lastPathComponent, heard: nil, color: lime)
+            }
+        }
+        return true
+    }
+
     var pendingDelegate: (target: String, message: String, newSession: Bool)?
     var pendingSaid = ""
     func askToDelegate(target: String, message: String, newSession: Bool, speakQuestion: Bool = true, said: String = "") {

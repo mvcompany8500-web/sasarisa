@@ -112,6 +112,10 @@ enum SelfTest {
         check(pk, "네이버 이메일 좀 켜줘", .web(label: "네이버 메일", query: "", url: "https://mail.naver.com"))
         check(pk, "네 번째 메일을 클릭해", .mailNth(4))
         check(pk, "두 번째 메일 열어", .mailNth(2))
+        check(pk, "힉스필드로 바다 위 거북이 5초 영상 만들어", .higgsfield("힉스필드로 바다 위 거북이 5초 영상 만들어"))
+        checkBool("「익스필드로 그려 줘」 → Higgsfield", Higgsfield.request("익스필드로 고양이 그려 줘") != nil)
+        checkBool("no 힉스필드, no credits", Higgsfield.request("바다 위 거북이 영상 만들어") == nil)
+        checkBool("last JSON line", (try? Higgsfield.lastJSON("thinking…\n{\"tool\":\"generate_image\",\"credits\":0.25}").get())?["credits"] != nil)
         do { var g = Config(); g.language = "ko"; g.assistantName = "거북아"; let pg = Parser(cfg: g)
              checkBool("「거북이 버프입니다」 is not a call", pg.wakeRange("안녕하세요 거북이 버프입니다") == nil)
              checkBool("「거북아 유튜브 틀어」 is a call", pg.wakeRange("거북아 유튜브 틀어") != nil) }

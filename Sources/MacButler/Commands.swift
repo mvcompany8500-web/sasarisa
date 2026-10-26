@@ -9,7 +9,8 @@ enum Intent: Equatable {
     case youtube(String)          // "" = YouTube home
     case youtubeNth(Int)
     case seek(Int)                // 「빨리 감기」「30초 되감기」 — seconds, + forward / − back (YouTube's l / j)
-    case mailNth(Int)             // 「네 번째 메일 열어」 — the nth mail in the web mail list in front
+    case mailNth(Int)
+    case higgsfield(String)       // 「힉스필드로 … 만들어」 — priced first (0 credits), made once after 「응」             // 「네 번째 메일 열어」 — the nth mail in the web mail list in front
     case search(String)
     case web(label: String, query: String, url: String)   // shopping / site search
     case remember(String)                                   // 「기억해: …」 — a long-term note
@@ -196,6 +197,7 @@ struct Parser {
             if before.allSatisfy({ parse($0, hasYouTubeList: hasYouTubeList) != .none }) { return .multi(before + [String(s[k.lowerBound...])]) }
         }
         if Parser.match(Parser.squash(s), "^카(?:카오)?톡(?:방|창)?(?:에서|에)?(?:전송|전속|보내기|엔터)(?:버튼)?(?:좀)?(?:눌러|클릭|쳐)") != nil { return .kakaoReply(to: "", text: "") }
+        if let r = Higgsfield.request(s) { return .higgsfield(r) }
         // Done here, not by the brain (10/25 filming: 10–15 s each through Codex)
         if let sk = Parser.seek(s) { return .seek(sk) }
         if let m = Parser.mailSite(s) { return .web(label: m.0, query: "", url: m.1) }

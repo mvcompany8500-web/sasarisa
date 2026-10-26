@@ -197,6 +197,27 @@ Everything lives in `~/.macbutler/`:
 }
 ```
 
+## Make images & videos with Higgsfield (credit-saving)
+
+With a [Higgsfield](https://higgsfield.ai) account you can say 「힉스필드로 … 영상 만들어」 / “Higgsfield, make a 5-second video of …”.
+
+**Connect once** (needs Claude Code), then allow it in the browser window that opens:
+```
+claude mcp add --transport http --scope user higgsfield https://mcp.higgsfield.ai/mcp
+```
+
+**Credits are money, so:**
+1. **Price first, 0 credits.** It plans the cheapest way and only asks the price (`get_cost`) — “5 s video · seedance mini · 720p, 5 credits. Make it?”
+2. **Made only after you say yes** — even in free mode. No answer or “no” = 0 credits.
+3. **Cheapest by default:** one output; video 5 s, 720p, a mini model (same 5 s: 22.5 → 5 credits); stills on the cheapest model (~0.25); lip-sync only for the talking part. A model, length or resolution you name is kept.
+4. **No re-rolls:** the approved one is made once; a failure is reported, not retried.
+5. **Per-job cap:** anything over 50 credits is refused (`hfMaxCredits` in config.json).
+6. **Reuse:** “from that picture, make a video” starts from the earlier result instead of a new still.
+
+2, 4 and 5 are enforced by Sasarisa's guard, not left to the AI: an unpriced, unapproved or second generation is blocked before it reaches Higgsfield. Results land in `~/Movies/Sasarisa` / `~/Pictures/Sasarisa` and are shown in Finder (not played).
+
+> Higgsfield's unlimited / free generations apply on its website only — generating through MCP always spends credits.
+
 ## Free & Pro
 
 **Sasarisa is free and open source.** Everything that runs on your Mac, your subscription or your own API key is free, and stays free.

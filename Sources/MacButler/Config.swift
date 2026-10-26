@@ -42,6 +42,7 @@ struct Config: Codable {
     var claudeModel = "sonnet"
     var confirmDelegate = "never"       // how boldly it acts: "never" = do it right away (default) · "brain" = ask before Claude hands work on · "always" = ask first, ask when unsure
     var freeMode = false               // 자유 모드: sending, posting, deleting and hand-offs to Claude go without asking — paying always asks
+    var hfMaxCredits = 50.0            // 힉스필드: one generation may cost at most this many credits (higher → refused; every one is asked first)
     var freeModeAsked = false          // the one-time 「다음부터는 묻지 않을까요?」 has been asked
     var polishDictation = false        // 받아쓰기 다듬기: Apple Intelligence tidies dictation before it's pasted (Handy's post-process)
     var previewBeforeSend = false      // 보내기 전 미리 보기: the message for Claude is shown and only sent after a spoken 「응」
@@ -87,7 +88,7 @@ struct Config: Codable {
         greetingText = v(.greetingText, z.greetingText); bootTitle = v(.bootTitle, z.bootTitle); bootStyle = v(.bootStyle, z.bootStyle); bootSubtitle = v(.bootSubtitle, z.bootSubtitle)
         greetOpen = v(.greetOpen, z.greetOpen)
         brainProvider = v(.brainProvider, z.brainProvider); brainModel = v(.brainModel, z.brainModel); brainBaseURL = v(.brainBaseURL, z.brainBaseURL); brainEffort = v(.brainEffort, z.brainEffort)
-        claudePath = v(.claudePath, z.claudePath); claudeModel = v(.claudeModel, z.claudeModel); brainAccess = v(.brainAccess, z.brainAccess); confirmDelegate = v(.confirmDelegate, z.confirmDelegate); freeMode = v(.freeMode, z.freeMode); freeModeAsked = v(.freeModeAsked, z.freeModeAsked); growTogether = v(.growTogether, z.growTogether); proRemote = v(.proRemote, z.proRemote); previewBeforeSend = v(.previewBeforeSend, z.previewBeforeSend); polishDictation = v(.polishDictation, z.polishDictation)
+        claudePath = v(.claudePath, z.claudePath); claudeModel = v(.claudeModel, z.claudeModel); brainAccess = v(.brainAccess, z.brainAccess); confirmDelegate = v(.confirmDelegate, z.confirmDelegate); freeMode = v(.freeMode, z.freeMode); freeModeAsked = v(.freeModeAsked, z.freeModeAsked); hfMaxCredits = v(.hfMaxCredits, z.hfMaxCredits); growTogether = v(.growTogether, z.growTogether); proRemote = v(.proRemote, z.proRemote); previewBeforeSend = v(.previewBeforeSend, z.previewBeforeSend); polishDictation = v(.polishDictation, z.polishDictation)
         whisperModel = v(.whisperModel, z.whisperModel); whisperServer = v(.whisperServer, z.whisperServer)
         tts = v(.tts, z.tts); ttsVoice = v(.ttsVoice, z.ttsVoice); ttsModel = v(.ttsModel, z.ttsModel); ttsRegion = v(.ttsRegion, z.ttsRegion); ttsURL = v(.ttsURL, z.ttsURL); sayVoice = v(.sayVoice, z.sayVoice); sayRate = v(.sayRate, z.sayRate); elevenLabs = v(.elevenLabs, z.elevenLabs)
         inputDevice = v(.inputDevice, z.inputDevice); outputDevice = v(.outputDevice, z.outputDevice)

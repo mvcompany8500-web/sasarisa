@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- **Make images and videos with Higgsfield by voice, saving credits:** 「힉스필드로 … 만들어」 → the cheapest plan and its price first (0 credits) → made once after 「응」 → saved to ~/Movies|Pictures/Sasarisa. A guard blocks unpriced, unapproved, multi-output and repeat generations; a per-job cap (50 credits) and a history to reuse earlier results. `MacButler --hf "<request>" [--make]` does the same from the terminal
+
 ## 0.7.2 — 2026-10-26 · Runs on macOS 14 Sonoma and Intel Macs, much faster replies
 - **Opens on macOS 14 (Sonoma) and 15 again, and on Intel Macs:** 0.7.1 was built for macOS 27 only, so it wouldn't start on older macOS even though macOS 14 was listed. The app is now one universal file (Apple silicon + Intel) for macOS 14 and later
 - **Much faster after you speak:** commands now go to the front of the transcription queue, and stray sounds (claps, a recording app, people talking) are no longer all transcribed in the background — commands waited 5–26 s behind them. Simple commands (close tabs, back, volume, what time, KakaoTalk send) run on the live text right away
