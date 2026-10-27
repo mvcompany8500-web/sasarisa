@@ -276,6 +276,11 @@ enum SelfTest {
                       && zip(a, a.dropFirst()).contains { $0 == "--disable" && $1 == "shell_tool" }
                       && zip(a, a.dropFirst()).contains { $0 == "--disable" && $1 == "unified_exec" }
                       && zip(a, a.dropFirst()).contains { $0 == "--disable" && $1 == "computer_use" })
+            // an older Codex that doesn't know newer features / flags: never pass names it would refuse (10/27 viewer bug)
+            let old = CodexBrain.Caps(features: ["shell_tool", "apps", "computer_use"], execHelp: "--json --ephemeral --skip-git-repo-check --sandbox --color -C")
+            let o = CodexBrain.arguments(cc, prompt: "x", caps: old)
+            checkBool("codex (older): only features it knows are switched off",
+                      zip(o, o.dropFirst()).contains { $0 == "--disable" && $1 == "shell_tool" } && !o.contains("goals") && !o.contains("memories") && !o.contains("--ignore-rules"))
             checkBool("codex: only the butler tool box, safe mode on", a.contains { $0.hasPrefix("mcp_servers.butler.command=") } && a.contains("mcp_servers.butler.env.MACBUTLER_SAFE=\"1\"") && a.last == "x")
             let b = CodexBrain(cfg: cc)
             b.handle(["type": "item.started", "item": ["type": "mcp_tool_call", "tool": "open_app", "arguments": ["name": "Safari"]]])

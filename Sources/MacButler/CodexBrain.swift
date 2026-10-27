@@ -36,14 +36,45 @@ final class CodexBrain: Thinker {
               let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let ms = o["models"] as? [[String: Any]] else { return [] }
         return ms.compactMap { $0["visibility"] as? String == "list" ? $0["slug"] as? String : nil }
     }
+    /// What the installed Codex knows: its feature names (`codex features list`) and `codex exec` flags. Codex refuses to run
+    /// at all when told to switch off a feature it doesn't know (「Unknown feature flag」) — 10/27 a viewer's Codex (another
+    /// version) failed every brain turn with 「잘 안 됐습니다」 while quick commands worked. Asked once per Codex binary.
+    struct Caps { let features: Set<String>?; let execHelp: String }
+    private static var caps: (key: String, value: Caps)?
+    private static let capsLock = NSLock()          // warmed in the background, read on the main thread
+    static func capabilities(_ bin: String) -> Caps {
+        capsLock.lock(); defer { capsLock.unlock() }
+        let mtime = (try? FileManager.default.attributesOfItem(atPath: bin)[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        let key = bin + "@\(mtime)"
+        if let c = caps, c.key == key { return c.value }
+        func run(_ args: [String]) -> String? {
+            let p = Process(); p.executableURL = URL(fileURLWithPath: bin); p.arguments = args
+            var env = ProcessInfo.processInfo.environment; env["PATH"] = Paths.envPath; env["NO_COLOR"] = "1"; p.environment = env
+            let o = Pipe(); p.standardOutput = o; p.standardError = Pipe(); p.standardInput = FileHandle.nullDevice
+            guard (try? p.run()) != nil else { return nil }
+            let kill = DispatchWorkItem { if p.isRunning { p.terminate() } }
+            DispatchQueue.global().asyncAfter(deadline: .now() + 10, execute: kill)
+            let d = o.fileHandleForReading.readDataToEndOfFile(); p.waitUntilExit(); kill.cancel()
+            return p.terminationStatus == 0 ? String(decoding: d, as: UTF8.self) : nil
+        }
+        let list = run(["features", "list"])
+        let features = list.map { Set($0.split(separator: "\n").compactMap { $0.split(separator: " ").first.map(String.init) }) }
+        let value = Caps(features: features?.isEmpty == false ? features : nil, execHelp: run(["exec", "--help"]) ?? "")
+        log("codex caps: \(value.features?.count ?? 0) features · flags \(["--ignore-user-config", "--ignore-rules", "--ephemeral"].filter { value.execHelp.contains($0) })")
+        caps = (key, value)
+        return value
+    }
     /// Everything except the tool box is switched off. Fixed here, where the model can't change it.
-    static func arguments(_ cfg: Config, prompt: String) -> [String] {
+    static func arguments(_ cfg: Config, prompt: String, caps: Caps? = nil) -> [String] {
         let box = Paths.tools.appendingPathComponent("butler-mcp").path
         let off = ["shell_tool", "unified_exec", "apps", "browser_use", "browser_use_external", "computer_use", "image_generation",
                    "plugins", "multi_agent", "hooks", "goals", "tool_suggest", "skill_mcp_dependency_install", "skill_search", "memories"]
-        var a = ["exec", "--json", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules",
-                 "--sandbox", "read-only", "--color", "never", "-C", Paths.home.appendingPathComponent("work").path]
-        for f in off { a += ["--disable", f] }
+        // only flags and feature names this Codex knows (an unknown one stops it before it starts)
+        let has = { (flag: String) in caps.map { $0.execHelp.isEmpty || $0.execHelp.contains(flag) } ?? true }
+        var a = ["exec", "--json"] + ["--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules"].filter(has)
+            + ["--sandbox", "read-only", "--color", "never", "-C", Paths.home.appendingPathComponent("work").path]
+        let known = caps.map { c in off.filter { c.features?.contains($0) ?? false } } ?? off
+        for f in known { a += ["--disable", f] }
         func q(_ s: String) -> String { "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\"" }
         let effort = ["low", "medium", "high"].contains(cfg.brainEffort) ? cfg.brainEffort : "low"
         a += ["-c", "approval_policy=\"never\"", "-c", "model_reasoning_effort=\"\(effort)\"",
@@ -56,7 +87,7 @@ final class CodexBrain: Thinker {
         return a + [prompt]
     }
 
-    func warm() {}          // a fresh `codex exec` per turn
+    func warm() { if let b = CodexBrain.binary { DispatchQueue.global(qos: .utility).async { _ = CodexBrain.capabilities(b) } } }   // a fresh `codex exec` per turn; learn once what this Codex knows
 
     func ask(_ command: String, live: String, frontApp: String, context: String, step: @escaping (String) -> Void, done: @escaping (String) -> Void) {
         guard let bin = CodexBrain.binary else {
@@ -73,7 +104,7 @@ final class CodexBrain: Thinker {
 
         let p = Process()
         p.executableURL = URL(fileURLWithPath: bin)
-        p.arguments = CodexBrain.arguments(cfg, prompt: prompt)
+        p.arguments = CodexBrain.arguments(cfg, prompt: prompt, caps: CodexBrain.capabilities(bin))
         p.currentDirectoryURL = Paths.home.appendingPathComponent("work")
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = Paths.envPath; env["NO_COLOR"] = "1"
@@ -170,6 +201,9 @@ final class CodexBrain: Thinker {
             d(cfg.ko ? "Codex 로그인이 필요해요. 터미널에서 codex login 을 한 번 해 주세요." : "Codex needs you to sign in — run codex login once in Terminal.")
         } else if why.contains("model_not_found") || why.contains("model is not supported") {
             d(cfg.ko ? "Codex가 그 모델 이름을 받지 않아요. 설정의 모델 이름을 비우면 기본 모델로 해요." : "Codex doesn't accept that model name — leave Model empty to use its default.")
+        } else if why.contains("unknown feature") || why.contains("unexpected argument") || why.contains("unrecognized") || why.contains("found argument") {
+            d(cfg.ko ? "설치된 Codex 판이 사사리사와 안 맞아요. 터미널에서 Codex를 업데이트해 주세요(npm i -g @openai/codex 또는 brew upgrade codex)."
+                     : "Your Codex version doesn't match Sasarisa. Update Codex in Terminal (npm i -g @openai/codex or brew upgrade codex).")
         } else if why.contains("usage limit") || why.contains("rate limit") || why.contains("429") {
             d(cfg.ko ? "Codex 사용 한도가 찼어요. 잠시 뒤에 다시 하거나 설정에서 두뇌를 바꿔 주세요." : "Codex hit its usage limit. Try later or pick another brain in Settings.")
         } else {

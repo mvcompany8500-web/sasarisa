@@ -209,6 +209,13 @@ if let i = CommandLine.arguments.firstIndex(of: "--hear"), CommandLine.arguments
     exit(0)
 }
 if CommandLine.arguments.contains("--selftest") { exit(SelfTest.run() ? 0 : 1) }
+// `--ask "<command>"` runs one brain turn (the brain chosen in Settings) and prints the answer — no voice, no HUD.
+if let i = CommandLine.arguments.firstIndex(of: "--ask"), i + 1 < CommandLine.arguments.count {
+    let brain = Brains.make(Config.load())
+    brain.ask(CommandLine.arguments[i + 1], live: "", frontApp: NSWorkspace.shared.frontmostApplication?.localizedName ?? "", context: "",
+              step: { print("· \($0)") }, done: { print("→ \($0)"); exit(0) })
+    RunLoop.main.run()
+}
 // `--hf "<request>"` prints the Higgsfield plan and price (0 credits); add `--make` to also make it once (spends credits).
 if let i = CommandLine.arguments.firstIndex(of: "--hf"), i + 1 < CommandLine.arguments.count {
     let hf = Higgsfield(cfg: Config.load()), make = CommandLine.arguments.contains("--make")
