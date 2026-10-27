@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.3 — 2026-10-27 · Codex brain works with any Codex version, Higgsfield by voice
 - **Codex brain works with any Codex version:** Sasarisa now asks the installed Codex which features it knows (`codex features list`) and only switches off those — an older or newer Codex refused to start when given a name it didn't know, so every AI turn said 「잘 안 됐습니다」 while quick commands still worked (reported by a viewer). If Codex itself is too old, it now says so and how to update
 - `MacButler --ask "<command>"` runs one brain turn from the terminal (no voice)
 - **Make images and videos with Higgsfield by voice, saving credits:** 「힉스필드로 … 만들어」 → the cheapest plan and its price first (0 credits) → made once after 「응」 → saved to ~/Movies|Pictures/Sasarisa. A guard blocks unpriced, unapproved, multi-output and repeat generations; a per-job cap (50 credits) and a history to reuse earlier results. `MacButler --hf "<request>" [--make]` does the same from the terminal
