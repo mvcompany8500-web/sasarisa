@@ -260,7 +260,39 @@ enum Paths {
     }()
     static var resources: URL { Bundle.main.resourceURL ?? URL(fileURLWithPath: ".") }
     static var tools: URL { resources.appendingPathComponent("bin") }
-    static let searchPath = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+    /// Where programs (codex, claude, node, whisper…) are looked for. An app doesn't get your terminal's PATH, so Codex or
+    /// Claude installed with npm under nvm / volta / bun — or their `node` — weren't found from the app while the terminal
+    /// was fine (10/29 viewer: every Codex turn 「잘 안 됐습니다」). Your login shell's PATH and the usual spots are added.
+    static let searchPath: [String] = {
+        var dirs = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
+        let home = NSHomeDirectory(), fm = FileManager.default
+        var more = ["\(home)/.local/bin", "\(home)/.volta/bin", "\(home)/.bun/bin", "\(home)/.npm-global/bin", "\(home)/Library/pnpm",
+                    "\(home)/.cargo/bin", "/opt/local/bin"]
+        // nvm: the newest installed node first
+        let nvm = "\(home)/.nvm/versions/node"
+        if let vs = try? fm.contentsOfDirectory(atPath: nvm) {
+            more += vs.sorted { $0.compare($1, options: .numeric) == .orderedDescending }.map { "\(nvm)/\($0)/bin" }
+        }
+        // your login shell's own PATH (bounded: a slow shell profile can't hold the app up for more than 3 s)
+        // Written to a file, not a pipe: something a profile starts in the background can hold a pipe open forever
+        // (10/29: `--doctor` hung right here on the owner's Mac).
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("sasarisa-path-\(getpid()).txt")
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        p.arguments = ["-lc", "printf %s \"$PATH\" > '\(out.path)'"]
+        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice; p.standardInput = FileHandle.nullDevice
+        if (try? p.run()) != nil {
+            let until = Date().addingTimeInterval(3)
+            while p.isRunning && Date() < until { usleep(50_000) }
+            if p.isRunning { p.terminate() }
+            more += ((try? String(contentsOf: out, encoding: .utf8)) ?? "").split(separator: ":").map(String.init)
+            try? fm.removeItem(at: out)
+        }
+        for d in more where !d.isEmpty && !dirs.contains(d) {
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: d, isDirectory: &isDir), isDir.boolValue { dirs.append(d) }
+        }
+        return dirs
+    }()
     static var envPath: String { ([tools.path] + searchPath).joined(separator: ":") }
 
     static func which(_ name: String, extra: [String] = []) -> String? {

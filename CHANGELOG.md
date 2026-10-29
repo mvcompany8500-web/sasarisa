@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.4 — 2026-10-29 · Finds Codex and Claude the way your terminal does, says what went wrong
+- **Finds Codex, Claude and node like your terminal does:** an app doesn't get your terminal's PATH, so Codex or Claude installed with npm under nvm / volta / bun (or their `node`) failed from Sasarisa while working in Terminal. Your login shell's PATH and the usual install spots are now searched too
+- **Says what went wrong:** instead of only 「잘 안 됐습니다」, a Codex failure shows its actual error; a missing `node`, an expired Claude login (401 → 「터미널에서 claude 실행 후 /login」) and usage limits get plain instructions
+- **No busy loop after each AI turn:** reading an AI's output kept being called after it had ended, using CPU for nothing
+- **`Sasarisa --doctor`:** versions, where codex / claude / node were found, permissions and one test question — paste it into a bug report
+
 ## 0.7.3 — 2026-10-27 · Codex brain works with any Codex version, Higgsfield by voice
 - **Codex brain works with any Codex version:** Sasarisa now asks the installed Codex which features it knows (`codex features list`) and only switches off those — an older or newer Codex refused to start when given a name it didn't know, so every AI turn said 「잘 안 됐습니다」 while quick commands still worked (reported by a viewer). If Codex itself is too old, it now says so and how to update
 - `MacButler --ask "<command>"` runs one brain turn from the terminal (no voice)

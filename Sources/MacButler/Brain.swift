@@ -130,7 +130,7 @@ final class Brain {
         p.standardInput = inPipe; p.standardOutput = out; p.standardError = FileHandle.nullDevice
         out.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
-            if d.isEmpty { return }
+            if d.isEmpty { h.readabilityHandler = nil; return }   // end of output: stop, or it is called again and again (10/29: a busy loop after every turn)
             DispatchQueue.main.async { self?.feed(d) }
         }
         p.terminationHandler = { [weak self] dead in
@@ -193,6 +193,17 @@ final class Brain {
         done = nil; step = nil; lastUse = Date()
         lastCommands = turnCommands; turnCommands = []
         let t = r.trimmingCharacters(in: .whitespacesAndNewlines)
+        let low = t.lowercased()
+        // 「API Error: 401 … OAuth token has expired」 read out raw was no help (10/29 viewer)
+        if low.hasPrefix("api error") || low.contains("oauth token has expired") || low.contains("invalid api key") || low.contains("please run /login") {
+            if low.contains("401") || low.contains("expired") || low.contains("/login") || low.contains("invalid api key") {
+                d(cfg.ko ? "클로드 로그인이 만료됐어요. 터미널에서 claude 를 실행하고 /login 으로 다시 로그인해 주세요." : "Your Claude login expired — run claude in Terminal and /login again.")
+                return
+            }
+            if low.contains("429") || low.contains("rate") || low.contains("usage limit") {
+                d(cfg.ko ? "클로드 사용 한도가 찼어요. 잠시 뒤에 하거나 설정에서 두뇌를 바꿔 주세요." : "Claude hit its usage limit — try later or switch the brain in Settings."); return
+            }
+        }
         d(t.isEmpty ? strings.failed : t)
     }
 

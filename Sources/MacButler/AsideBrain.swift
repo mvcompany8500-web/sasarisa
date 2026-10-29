@@ -59,12 +59,12 @@ final class AsideBrain: Thinker {
         out = Data(); err = Data()
         o.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
-            if d.isEmpty { return }
+            if d.isEmpty { h.readabilityHandler = nil; return }   // end of output: stop, or it is called again and again (10/29: a busy loop after every turn)
             DispatchQueue.main.async { self?.feed(d) }
         }
         e.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
-            if d.isEmpty { return }
+            if d.isEmpty { h.readabilityHandler = nil; return }   // end of output: stop, or it is called again and again (10/29: a busy loop after every turn)
             DispatchQueue.main.async { self?.err.append(d) }
         }
         p.terminationHandler = { [weak self] dead in

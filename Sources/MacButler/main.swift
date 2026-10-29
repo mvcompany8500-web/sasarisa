@@ -209,6 +209,41 @@ if let i = CommandLine.arguments.firstIndex(of: "--hear"), CommandLine.arguments
     exit(0)
 }
 if CommandLine.arguments.contains("--selftest") { exit(SelfTest.run() ? 0 : 1) }
+// `--doctor` prints what a bug report needs: versions, where codex/claude/node were found, permissions, then one brain turn.
+if CommandLine.arguments.contains("--doctor") {
+    setvbuf(stdout, nil, _IOLBF, 0)          // each line shows at once, even through a pipe
+    let cfg = Config.load()
+    func sh(_ bin: String?, _ args: [String]) -> String {
+        guard let bin else { return "없음" }
+        let p = Process(); p.executableURL = URL(fileURLWithPath: bin); p.arguments = args
+        var env = ProcessInfo.processInfo.environment; env["PATH"] = Paths.envPath; p.environment = env
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("sasarisa-doctor-\(getpid()).txt")
+        FileManager.default.createFile(atPath: out.path, contents: nil)
+        guard let h = try? FileHandle(forWritingTo: out) else { return "?" }
+        p.standardOutput = h; p.standardError = h; p.standardInput = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return "실행 안 됨" }
+        let until = Date().addingTimeInterval(10)
+        while p.isRunning && Date() < until { usleep(50_000) }
+        if p.isRunning { p.terminate() }
+        try? h.close()
+        defer { try? FileManager.default.removeItem(at: out) }
+        return ((try? String(contentsOf: out, encoding: .utf8)) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).components(separatedBy: "\n").first ?? ""
+    }
+    let v = ProcessInfo.processInfo.operatingSystemVersion
+    print("Sasarisa \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] ?? "?") · macOS \(v.majorVersion).\(v.minorVersion) · \(cfg.brainProvider.isEmpty ? "claude" : cfg.brainProvider) 두뇌")
+    let codex = CodexBrain.binary, claude = cfg.claudeBinary, node = Paths.which("node")
+    print("codex: \(codex ?? "못 찾음") · \(sh(codex, ["--version"]))")
+    print("claude: \(claude ?? "못 찾음") · \(sh(claude, ["--version"]))")
+    print("node: \(node ?? "못 찾음") · \(sh(node, ["--version"]))")
+    print("권한: 손쓰기(손쉬운 사용) \(AXIsProcessTrusted() ? "켜짐" : "꺼짐") · 화면 기록 \(CGPreflightScreenCaptureAccess() ? "켜짐" : "꺼짐")")
+    print("찾는 곳: \(Paths.searchPath.joined(separator: ":"))")
+    let q = cfg.ko ? "지금 화면에 뭐 보여?" : "What's on my screen?"
+    print("두뇌 시험: \(q)")
+    let doctorBrain = Brains.make(cfg)          // kept: the brain's callbacks hold it weakly
+    doctorBrain.ask(q, live: "", frontApp: NSWorkspace.shared.frontmostApplication?.localizedName ?? "", context: "",
+                    step: { print("· \($0)") }, done: { print("→ \($0)"); _ = doctorBrain; exit(0) })
+    RunLoop.main.run()
+}
 // `--ask "<command>"` runs one brain turn (the brain chosen in Settings) and prints the answer — no voice, no HUD.
 if let i = CommandLine.arguments.firstIndex(of: "--ask"), i + 1 < CommandLine.arguments.count {
     let brain = Brains.make(Config.load())

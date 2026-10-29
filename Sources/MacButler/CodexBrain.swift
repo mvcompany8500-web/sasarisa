@@ -114,12 +114,12 @@ final class CodexBrain: Thinker {
         buffer = Data(); err = Data(); answer = ""; turnCommands = []
         o.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
-            if d.isEmpty { return }
+            if d.isEmpty { h.readabilityHandler = nil; return }   // end of output: stop, or it is called again and again (10/29: a busy loop after every turn)
             DispatchQueue.main.async { self?.feed(d) }
         }
         e.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
-            if d.isEmpty { return }
+            if d.isEmpty { h.readabilityHandler = nil; return }   // end of output: stop, or it is called again and again (10/29: a busy loop after every turn)
             DispatchQueue.main.async { if (self?.err.count ?? 0) < 20_000 { self?.err.append(d) } }
         }
         p.terminationHandler = { [weak self] dead in
@@ -206,8 +206,14 @@ final class CodexBrain: Thinker {
                      : "Your Codex version doesn't match Sasarisa. Update Codex in Terminal (npm i -g @openai/codex or brew upgrade codex).")
         } else if why.contains("usage limit") || why.contains("rate limit") || why.contains("429") {
             d(cfg.ko ? "Codex 사용 한도가 찼어요. 잠시 뒤에 다시 하거나 설정에서 두뇌를 바꿔 주세요." : "Codex hit its usage limit. Try later or pick another brain in Settings.")
+        } else if why.contains("env: node") || why.contains("node: no such file") || why.contains("command not found") {
+            d(cfg.ko ? "Codex를 돌릴 node를 못 찾았어요. 터미널에서 which node 로 위치를 확인하고, 사사리사를 다시 켜 주세요."
+                     : "Couldn't find node to run Codex. Check `which node` in Terminal, then restart Sasarisa.")
         } else {
-            d(strings.failed)
+            // say what actually went wrong (10/29: a viewer only ever saw 「잘 안 됐습니다」)
+            let line = String(data: err, encoding: .utf8)?.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+                .last { !$0.isEmpty && !$0.hasPrefix("at ") } ?? ""
+            d(line.isEmpty ? strings.failed : (cfg.ko ? "Codex 오류: " : "Codex error: ") + String(line.prefix(120)))
         }
     }
 

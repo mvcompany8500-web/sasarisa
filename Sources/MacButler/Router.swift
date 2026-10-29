@@ -59,7 +59,7 @@ final class Router {
         p.standardInput = inPipe; p.standardOutput = out; p.standardError = FileHandle.nullDevice
         out.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
-            if d.isEmpty { return }
+            if d.isEmpty { h.readabilityHandler = nil; return }   // end of output: stop, or it is called again and again (10/29: a busy loop after every turn)
             DispatchQueue.main.async { self?.feed(d) }
         }
         p.terminationHandler = { [weak self] dead in DispatchQueue.main.async { if self?.proc === dead { self?.proc = nil; self?.reply(nil) } } }
