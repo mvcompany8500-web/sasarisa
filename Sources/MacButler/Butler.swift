@@ -463,7 +463,7 @@ final class Butler {
         // A scrap after the name (「거북아보다」→「보다」, 「뽑았다」) isn't a command — don't spend 7 s of the brain on it (10/25); just listen.
         // (Not when it just asked something — then 「응」「그래」 are answers.)
         if !cmd.isEmpty, Parser.squash(cmd).count <= 3, parser.parse(cmd, hasYouTubeList: !ytList.isEmpty) == .none,
-           brainAskedAt.map({ Date().timeIntervalSince($0) > 90 }) ?? true, !awaitingSend, retryLater == nil || Date() > retryUntil {
+           brainAskedAt.map({ Date().timeIntervalSince($0) > 90 }) ?? true, !awaitingSend, pendingHF == nil, pendingAction == nil, pendingDelegate == nil, !askingFreeMode, retryLater == nil || Date() > retryUntil {   // 10/29: a pending yes/no (Higgsfield price etc.) takes 「응」 as the answer
             log("too short to be a command (「\(cmd)」) — just listening"); converse(chime: true); return
         }
         if let again = retryLater, Date() < retryUntil, Parser.match(Parser.squash(cmd), "^(열었|열어놨|열어뒀|열어놓았|열었어|켰어|다시해|다시|이제해|이제됐|됐어다시|해봐다시|tryagain|again|opened)") != nil {
@@ -1085,7 +1085,7 @@ final class Butler {
                     guard let self else { return }
                     self.converse(keep: true)
                     self.hud.show(self.S.t("◌ 힉스필드 · \(cost)\(left) — 만들까요? 「응」 / 「아니」", "◌ Higgsfield · \(cost)\(left) — make it? “yes” / “no”"), plan.summary, heard: nil, color: amber)
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
                         if self?.pendingHF?.request == plan.request { self?.pendingHF = nil; log("higgsfield: no answer — nothing made") }
                     }
                 }
