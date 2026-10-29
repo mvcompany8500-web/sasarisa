@@ -90,7 +90,8 @@ let irreversible: [(kind: String, words: [String])] = [
     ("send", ["보내기", "보내", "전송", "send"]),
     ("pay", ["결제", "구매", "구입", "주문하기", "송금", "이체", "pay", "buy", "purchase", "checkout", "placeorder"]),
     ("post", ["게시", "올리기", "업로드", "post", "publish", "upload", "tweet"]),
-    ("delete", ["삭제", "지우기", "휴지통비우기", "delete", "emptytrash"])]
+    ("delete", ["삭제", "지우기", "휴지통비우기", "delete", "emptytrash"]),
+    ("spend", ["생성하기", "generate", "render", "크레딧사용", "usecredits"])]   // 10/29: AI-generation sites charge credits per press (Higgsfield 「생성하기」 cost 80 by mistake)
 let browsing = ["게시판", "게시물", "게시글", "주문내역", "구매내역", "결제내역", "결제수단", "보낸편지함", "보낸메일", "보낸항목", "sent", "posts"]
 func irreversibleKind(_ name: String) -> String? {
     let n = name.lowercased().filter { $0.isLetter || $0.isNumber }

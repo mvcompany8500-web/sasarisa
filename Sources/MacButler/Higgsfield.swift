@@ -20,7 +20,7 @@ final class Higgsfield {
 
     /// 「힉스필드로 … 만들어/그려/뽑아」 — the word 힉스필드 must be said: nothing here spends credits by accident.
     static func request(_ s: String) -> String? {
-        guard s.range(of: "[힉익히]스\\s*[필펠플빌]드|히그스\\s*필드|higgs\\s*field", options: [.regularExpression, .caseInsensitive]) != nil,
+        guard s.range(of: "[힉익히]스\\s*[필펠플빌피]드|히그스\\s*필드|higgs\\s*field", options: [.regularExpression, .caseInsensitive]) != nil,
               s.range(of: "만들|그려|생성|뽑아|제작|make|generate|create|render", options: [.regularExpression, .caseInsensitive]) != nil else { return nil }
         return s
     }

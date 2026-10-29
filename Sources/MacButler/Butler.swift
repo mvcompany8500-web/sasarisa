@@ -1154,7 +1154,7 @@ final class Butler {
     var askingFreeMode = false
     /// After a send/post/delete the user said yes to, ask once: 「다음부터는 묻지 않고 바로 할까요?」 (payments keep asking).
     func offerFreeMode(_ kind: String) {
-        guard !freeMode, kind != "pay", !cfg.freeModeAsked, !UserDefaults.standard.bool(forKey: "freeModeAsked") else { return }
+        guard !freeMode, kind != "pay", kind != "spend", !cfg.freeModeAsked, !UserDefaults.standard.bool(forKey: "freeModeAsked") else { return }
         UserDefaults.standard.set(true, forKey: "freeModeAsked"); Config.set("freeModeAsked", true)
         askingFreeMode = true
         speak(S.t("다음부터는 묻지 않고 바로 할까요? 결제는 계속 묻습니다.", "Shall I do these without asking from now on? Payments will still ask.")) { [weak self] in
@@ -1190,11 +1190,11 @@ final class Butler {
         let p = text.components(separatedBy: "\u{1F}")
         guard p.count >= 4 else { return "ask" }
         let kind = p[0]
-        if remote != nil, kind == "pay" || !freeMode {
+        if remote != nil, kind == "pay" || kind == "spend" || !freeMode {
             remote!.held = kind; log("remote: \(kind) not done from the phone → \(p[2])"); return "ask"
         }
         // 자유 모드 (the owner chose it): no question for sending, posting, deleting — paying always asks.
-        if freeMode, kind != "pay" { log("free mode: \(kind) without asking → \(p[2])"); return "yes" }
+        if freeMode, kind != "pay", kind != "spend" { log("free mode: \(kind) without asking → \(p[2])"); return "yes" }   // spend = AI-site 「생성하기」 (credits) asks like paying (10/29)
         // Pressed without asking only when the user held the hotkey and said it (a TV or a video can say "보내",
         // it can't hold the key). Spoken the normal way, it asks once.
         if cfg.confirmDelegate != "always", brainByHold, Butler.userAskedFor(kind, brainCommand) {
