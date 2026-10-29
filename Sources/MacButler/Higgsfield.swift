@@ -118,7 +118,7 @@ final class Higgsfield {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = Paths.envPath + ":" + (env["PATH"] ?? "")
         env["ENABLE_TOOL_SEARCH"] = "false"   // 10/29: deferred tool loading sometimes left the Higgsfield tools unloaded («never loaded»)
-        env["MCP_TIMEOUT"] = "30000"          // the remote server can be slow to connect
+        env["MCP_TIMEOUT"] = "120000"; env["MCP_TOOL_TIMEOUT"] = "180000"   // 10/29: the remote tool list took ~60 s; 30 s timed out
         p.environment = env
         let pipe = Pipe(); p.standardOutput = pipe; p.standardError = FileHandle.nullDevice
         proc = p
