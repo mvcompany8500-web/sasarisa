@@ -1094,7 +1094,10 @@ final class Butler {
     }
     func answerHF(_ a: String) -> Bool {
         guard let plan = pendingHF else { return false }
-        let s = Parser.squash(a)
+        // 10/29: Whisper heard a clear 「응 응」 as 「음! 음!」 — for a yes/no, either transcript saying yes/no counts.
+        let yesNo = ["응", "네", "예", "그래", "좋아", "만들어", "ㅇㅇ", "오케이", "고고", "진행", "yes", "yeah", "ok", "okay", "sure", "go", "아니", "취소", "하지마", "됐어", "말고", "no", "nope", "cancel", "stop"]
+        let live = Parser.squash(lastLive), heard = Parser.squash(a)
+        let s = !yesNo.contains(where: { heard.hasPrefix($0) }) && yesNo.contains(where: { live.hasPrefix($0) }) ? live : heard
         pendingHF = nil
         if ["아니", "취소", "하지마", "됐어", "말고", "no", "nope", "cancel", "stop"].contains(where: { s.hasPrefix($0) || s.contains("하지마") }) {
             Sound.named("Pop"); log("higgsfield: declined — nothing made"); done(S.t("힉스필드", "Higgsfield"), S.t("안 만들었어요 (크레딧 0)", "Not made (0 credits)")); return true
