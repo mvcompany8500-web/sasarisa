@@ -128,9 +128,10 @@ claude mcp add --transport http --scope user higgsfield https://mcp.higgsfield.a
 ## 막힐 때
 
 - 불러도 반응이 없다 → 메뉴 ◉ → 상태 점검에 ✗ 가 있는지 보세요. ✗ 를 누르면 해당 설정이 열립니다.
+- 불러도·이름 맞추기를 해도 아무 반응이 없다 → **시스템 설정 → 키보드 → 받아쓰기**를 켜 주세요(언어에 한국어). 맥 받아쓰기가 꺼져 있으면 맥 음성 인식이 아예 멈춥니다. 0.7.4부터는 화면 카드로 알려 주고, Whisper 가 있으면 그것으로 대신 듣습니다.
 - 글자가 안 들어간다 → 「손쉬운 사용」 목록에서 사사리사를 지우고 다시 추가하세요.
 - 한국어를 잘 못 알아듣는다 → 준비 화면에서 Whisper 모델을 받았는지, 오른쪽 ⌥ 누르고 말하기로 해 보세요.
-- 그래도 안 되면 [이슈](../../issues/new/choose)에 남겨 주세요.
+- 그래도 안 되면 터미널에 `/Applications/Sasarisa.app/Contents/MacOS/Sasarisa --doctor` 를 붙여 넣고, 나온 결과와 함께 [이슈](../../issues/new/choose)에 남겨 주세요.
 
 ---
 

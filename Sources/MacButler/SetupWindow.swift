@@ -11,6 +11,8 @@ final class SetupModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     let cfg: Config
     @Published var mic = false
     @Published var speech = false
+    @Published var dictation: NSError?? = .none     // Apple's recognizer really writes text here (.none = not checked yet)
+    private var checking = false, lastCheck = Date.distantPast
     @Published var ax = false
     @Published var screen = false
     @Published var brain: String? = nil         // the AI that will think (Claude Code, Codex, Aside, an API or local model)
@@ -85,6 +87,11 @@ final class SetupModel: NSObject, ObservableObject, URLSessionDownloadDelegate {
     func refresh() {
         mic = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
         speech = SFSpeechRecognizer.authorizationStatus() == .authorized
+        // once allowed, try it for real — and again every 10 s while it fails (Dictation switched on in the meantime)
+        if speech, !checking, dictation == nil || (dictation! != nil && Date().timeIntervalSince(lastCheck) > 10) {
+            checking = true
+            SpeechCheck.run(locale: cfg.locale) { [weak self] e in self?.dictation = .some(e); self?.checking = false; self?.lastCheck = Date() }
+        }
         ax = AXIsProcessTrusted()
         screen = CGPreflightScreenCaptureAccess()
         brain = Brains.ready(Config.load())
@@ -188,6 +195,11 @@ struct SetupView: View {
                     }
                     row(m.speech, S.t("음성 인식", "Speech Recognition"), S.t("맥 안에서 말을 글자로", "On-device speech to text")) {
                         Button(S.t("허용", "Allow")) { SFSpeechRecognizer.requestAuthorization { _ in }; m.openPane("Privacy_SpeechRecognition") }
+                    }
+                    if m.speech, case .some(.some(let e)) = m.dictation {
+                        row(false, S.t("맥 받아쓰기", "Dictation"), SpeechCheck.describe(e, ko: m.cfg.ko) + (m.whisperBin && m.model ? S.t(" · 그동안은 위스퍼로 들어요", " · Whisper listens meanwhile") : ""), required: !(m.whisperBin && m.model)) {
+                            Button(S.t("설정 열기", "Open Settings")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")!) }
+                        }
                     }
                     row(m.ax, S.t("손쉬운 사용", "Accessibility"), S.t("글자 입력·버튼 누르기 (마우스는 안 움직임)", "Typing and pressing buttons (the mouse never moves)")) {
                         Button(S.t("설정 열기", "Open Settings")) { m.openPane("Privacy_Accessibility") }

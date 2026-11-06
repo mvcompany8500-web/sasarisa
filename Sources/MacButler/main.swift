@@ -69,7 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let S = Strings(ko: cfg.ko, name: cfg.displayName)
         let ok: [Bool] = [
             AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
-            SFSpeechRecognizer.authorizationStatus() == .authorized,
+            SFSpeechRecognizer.authorizationStatus() == .authorized && butler?.ear.appleDown == nil,
             AXIsProcessTrusted(), CGPreflightScreenCaptureAccess(),
             cfg.claudeBinary != nil,
             FileManager.default.fileExists(atPath: cfg.whisperModelPath) && cfg.whisperBinary != nil]
@@ -237,6 +237,12 @@ if CommandLine.arguments.contains("--doctor") {
     print("node: \(node ?? "못 찾음") · \(sh(node, ["--version"]))")
     print("권한: 손쓰기(손쉬운 사용) \(AXIsProcessTrusted() ? "켜짐" : "꺼짐") · 화면 기록 \(CGPreflightScreenCaptureAccess() ? "켜짐" : "꺼짐")")
     print("찾는 곳: \(Paths.searchPath.joined(separator: ":"))")
+    let speechAuth = ["묻기 전", "거절", "제한", "허용"][min(Int(SFSpeechRecognizer.authorizationStatus().rawValue), 3)]
+    print("마이크 \(AVCaptureDevice.authorizationStatus(for: .audio) == .authorized ? "허용" : "허용 안 됨") · 음성 인식 \(speechAuth)(터미널에서 열면 터미널 기준) · 입력 장치 \(AudioDevices.device(uid: cfg.inputDevice)?.name ?? "기본")")
+    print("위스퍼: \(cfg.whisperBinary ?? "whisper-server 없음 (brew install whisper-cpp)") · 모델 \(FileManager.default.fileExists(atPath: cfg.whisperModelPath) ? "있음" : "없음 (준비 화면에서 받기)")")
+    var speechDone = false
+    SpeechCheck.run(locale: cfg.locale) { e in print("맥 받아쓰기(\(cfg.locale)): \(SpeechCheck.describe(e, ko: true))"); speechDone = true }
+    while !speechDone { RunLoop.main.run(until: Date().addingTimeInterval(0.1)) }
     let q = cfg.ko ? "지금 화면에 뭐 보여?" : "What's on my screen?"
     print("두뇌 시험: \(q)")
     let doctorBrain = Brains.make(cfg)          // kept: the brain's callbacks hold it weakly

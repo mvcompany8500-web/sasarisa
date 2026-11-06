@@ -251,6 +251,8 @@ claude mcp add --transport http --scope user higgsfield https://mcp.higgsfield.a
 <summary><b>Troubleshooting</b></summary>
 
 * **Nothing happens when I say “Sasarisa”** — menu → *Status*: all ✓? Check `~/.macbutler/logs/butler.log` for `heard[...]` lines.
+* **Nothing happens at all, not even in the name voice check** — turn on **System Settings → Keyboard → Dictation** (with your language). With Dictation off, Apple's speech recognizer stops entirely; since 0.7.4 a card says so and Whisper (if installed) listens instead.
+* **Bug report** — paste the output of `/Applications/Sasarisa.app/Contents/MacOS/Sasarisa --doctor` into the issue.
 * **It types nothing** — Accessibility is off, or was reset after a rebuild. Remove Sasarisa from the list and add it again.
 * **“Claude Code is not installed”** — run `claude` once in Terminal, or set `"claudePath"` in config.json.
 * **Slow** — check `uptime` / Activity Monitor; heavy builds or renders slow everything down. Whisper only loads after you call it.

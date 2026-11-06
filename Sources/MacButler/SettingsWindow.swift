@@ -582,6 +582,7 @@ final class NameTrainingModel: ObservableObject {
     @Published var result = ""
     @Published var verdict = ""
     @Published var learned: [String] = []
+    @Published var problem = ""            // why nothing is being heard (permissions, Dictation off) — from Butler.trainProblem
     var onDone: () -> Void = {}
     private var observer: NSObjectProtocol?
     init() {
@@ -594,13 +595,15 @@ final class NameTrainingModel: ObservableObject {
                 self.learned = u["learned"] as? [String] ?? []
                 self.onDone()
             } else {
+                if let p = u["problem"] as? String { self.problem = p; if u["n"] == nil { return } }
+                else { self.problem = "" }
                 self.count = u["n"] as? Int ?? 0; self.heard = u["heard"] as? String ?? ""; self.next = u["next"] as? String ?? self.next
             }
         }
     }
     deinit { if let observer { NotificationCenter.default.removeObserver(observer) } }
     func start(_ name: String) {
-        training = true; count = 0; heard = ""; next = ""; result = ""; verdict = ""; learned = []
+        training = true; count = 0; heard = ""; next = ""; result = ""; verdict = ""; learned = []; problem = ""
         NotificationCenter.default.post(name: Notification.Name("MacButlerNameTrain"), object: name.isEmpty ? "Sasarisa" : name)
     }
     func stop() {
@@ -630,6 +633,7 @@ struct NameTrainingRow: View {
             }
             if t.training {
                 if !t.next.isEmpty { Text(S.t("지금 말할 것: 「\(t.next)」", "Say now: “\(t.next)”")).font(.callout.weight(.semibold)) }
+                if !t.problem.isEmpty { Text("⚠︎ " + t.problem).font(.callout).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true) }
                 Note(S.t("화면 구석 카드에 나오는 말을 한 번씩 끊어서, 평소 목소리로 따라 말해 주세요." + (t.heard.isEmpty ? "" : " 방금 들은 말: 「\(t.heard)」"),
                          "Say what the corner card shows, one at a time, in your normal voice." + (t.heard.isEmpty ? "" : " Just heard: “\(t.heard)”")))
             } else if !t.result.isEmpty {

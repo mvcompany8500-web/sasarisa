@@ -19,6 +19,7 @@ final class NameTrainer {
     private let whisper: Whisper?          // nil in the self-test
     var onProgress: (Int, String) -> Void = { _, _ in }      // (takes so far, what was heard)
     var onDone: (Result) -> Void = { _ in }
+    var onNothing: () -> Void = {}                           // a voice nothing could write down (not counted)
 
     init(name: String, base: Config, whisper: Whisper?) {
         self.name = name.trimmingCharacters(in: .whitespaces); self.base = base; self.whisper = whisper
@@ -43,7 +44,7 @@ final class NameTrainer {
         let finish = { [weak self] (full: String, raw: String) in
             guard let self else { return }
             // A voice burst nothing could read (no Whisper model yet, or just noise) isn't a take — it would count as a miss (10/25)
-            if Parser.squash(apple).isEmpty, Parser.squash(full).isEmpty, Parser.squash(raw).isEmpty { self.busy = false; log("name training: nothing readable — not counted"); return }
+            if Parser.squash(apple).isEmpty, Parser.squash(full).isEmpty, Parser.squash(raw).isEmpty { self.busy = false; log("name training: nothing readable — not counted"); self.onNothing(); return }
             self.samples.append(Sample(apple: apple, whisper: full, raw: raw, command: self.command(self.samples.count)))
             self.busy = false
             let shown = [full, apple].first { !Parser.squash($0).isEmpty } ?? ""

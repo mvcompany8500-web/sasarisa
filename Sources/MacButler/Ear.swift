@@ -27,6 +27,13 @@ final class Ear {
     var onUtterance: (String, [Float]) -> Void = { _, _ in }
     /// A short burst of voice the recognizer wrote nothing for (the name said quietly or from afar often ends up like this).
     var onSilentSpeech: ([Float]) -> Void = { _ in }
+    /// Apple's recognizer fails at once, again and again, with no text: Siri and Dictation are off (kLSRErrorDomain 201) or
+    /// this language's on-device files aren't on this Mac (102). 11/6 iMac M1 「불러도 반응을 안 합니다」 — it retried silently
+    /// forever. Non-nil = down (the error); nil = text is coming again.
+    var onAppleDown: (NSError?) -> Void = { _ in }
+    private(set) var appleDown: NSError?
+    private var quickFails = 0
+    private var plainHint = false            // 201 workaround: a task hint other than .dictation (developer forums)
     private var silentHandled = -1
     var onLevel: (Float) -> Void = { _ in }
     /// true: the mic has sent pure digital silence for 2 minutes (muted at the mic — 10/25 the Shure MV7+ was muted for 1.5 h
@@ -252,10 +259,19 @@ final class Ear {
         r.shouldReportPartialResults = true
         if recognizer.supportsOnDeviceRecognition { r.requiresOnDeviceRecognition = true }
         r.contextualStrings = hints
+        if plainHint { r.taskHint = .unspecified }
         if #available(macOS 13, *) { r.addsPunctuation = true }      // 「…야?」 keeps its question mark, like Handy
         if #available(macOS 14, *), r.requiresOnDeviceRecognition, let m = nameModel as? SFSpeechLanguageModel.Configuration { r.customizedLanguageModel = m }
         lock.lock(); request = r; segStart = max(ringEnd - 4800, ringBase); lock.unlock()   // keep 0.3 s before
         lastText = ""; lastChange = Date(); taskStart = Date()
+        // test hook: SASARISA_FAKE_SPEECH_ERROR=201 acts as if Dictation were off (the Apple-down path can't be switched on here)
+        if let c = ProcessInfo.processInfo.environment["SASARISA_FAKE_SPEECH_ERROR"].flatMap(Int.init) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                guard let self, myGen == self.gen else { return }
+                self.failed(NSError(domain: "kLSRErrorDomain", code: c, userInfo: [NSLocalizedDescriptionKey: "fake"]))
+            }
+            return
+        }
         task = recognizer.recognitionTask(with: r) { [weak self] res, err in
             DispatchQueue.main.async {
                 guard let self, myGen == self.gen else { return }
@@ -271,17 +287,40 @@ final class Ear {
                         self.onUtterance(prev, audio)
                         if myGen != self.gen { return }
                     }
+                    if !t.isEmpty { self.recovered() }
                     if t != self.lastText {
                         self.lastText = t; self.lastChange = Date()
                         self.lock.lock(); self.lastTextSample = self.ringEnd; self.lock.unlock()
                         self.onPartial(t)
                     }
                     if res.isFinal { self.flush() }
-                } else if err != nil {
-                    self.restart()
+                } else if let err = err as NSError? {
+                    self.failed(err)
                 }
             }
         }
+    }
+
+    /// A task that ends in an error within 2 s, before any text, is a quick fail. Normal ends (no speech for a while, our own
+    /// cancel) take longer or belong to an old task. Several in a row: wait longer each time and say what's wrong.
+    private func failed(_ err: NSError) {
+        // 1110 = no speech (a quiet room): the recognizer works. 216 / 301 = a cancel.
+        if err.code == 1110 || err.code == 216 || err.code == 301 { recovered(); restart(); return }
+        guard Date().timeIntervalSince(taskStart) < 2, lastText.isEmpty else { quickFails = 0; restart(); return }
+        quickFails += 1
+        if quickFails == 1 || quickFails % 20 == 0 { log("ear: recognizer error \(err.domain) \(err.code) · \(err.localizedDescription) (×\(quickFails))") }
+        if err.code == 201, !plainHint { plainHint = true }
+        if quickFails >= 4, appleDown == nil { appleDown = err; log("ear: Apple speech is down → Whisper hears instead"); onAppleDown(err) }
+        let wait = min(0.25 * pow(2, Double(min(quickFails, 8) - 1)), 15)
+        let myGen = gen
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+            guard let self, myGen == self.gen else { return }
+            self.restart()
+        }
+    }
+    private func recovered() {
+        quickFails = 0
+        if appleDown != nil { appleDown = nil; log("ear: Apple speech is back"); onAppleDown(nil) }
     }
 
     static func isReset(_ a: String, _ b: String) -> Bool {
@@ -331,7 +370,8 @@ final class Ear {
         if !lastText.isEmpty, quiet, Date().timeIntervalSince(lastChange) > (finished ? min(0.9, silenceSec) : silenceSec) { flush() }
         else if lastText.isEmpty, speechOnset != silentHandled, Date().timeIntervalSince(lastLoud) > 0.8, Date().timeIntervalSince(lastLoud) < 3 {
             lock.lock(); let len = ringEnd - speechOnset; lock.unlock()
-            if len > 6400 && len < 72000 { silentHandled = speechOnset; onSilentSpeech(segment()) }      // 0.4–4.5 s of voice, no text
+            // 0.4–4.5 s of voice, no text (up to 15 s while Apple's recognizer is down — then Whisper hears whole commands)
+            if len > 6400 && len < (appleDown != nil ? 16000 * 15 : 72000) { silentHandled = speechOnset; onSilentSpeech(segment()) }
         }
         else if lastText.isEmpty, Date().timeIntervalSince(taskStart) > 50 { restart() }
     }

@@ -1,5 +1,7 @@
 // The conductor: listens, decides, acts, speaks.
 import AppKit
+import AVFoundation
+import Speech
 
 final class Butler {
     enum Mode { case idle, awake, dictation, busy, speaking }
@@ -152,8 +154,21 @@ final class Butler {
         }
         ear.onSilentSpeech = { [weak self] audio in
             if let tr = self?.trainer { tr.take("", audio); return }
-            guard let self, self.mode == .idle else { return }
+            guard let self else { return }
+            // Apple's recognizer is down (Dictation off): Whisper is the only ear — what's said while awake goes through it too
+            if self.ear.appleDown != nil, self.whisper.available, self.mode != .idle, self.mode != .speaking {
+                self.whisper.transcribe(audio, fallback: "") { [weak self] full in
+                    guard let self, !Parser.squash(full).isEmpty else { return }
+                    self.utterance(full, audio: audio, final: true)
+                }
+                return
+            }
+            guard self.mode == .idle else { return }
             self.nameByWhisper("", audio)
+        }
+        ear.onAppleDown = { [weak self] err in
+            guard let self else { return }
+            if let err { self.appleDownCard(err) } else if self.mode == .idle, self.trainer == nil { self.hud.idle() }
         }
         // Teach the recognizer the name (made-up words come back as 「서 서 있어」 otherwise) — built once, then used from here on
         let names = Array(Set([cfg.displayName, cfg.assistantName] + cfg.wakes.filter { !$0.contains(" ") && $0 != "자비스" }.prefix(3))).filter { !$0.isEmpty }
@@ -293,7 +308,33 @@ final class Butler {
         }
     }
 
-    func utterance(_ t: String, audio: [Float]) {
+    /// Apple's speech has failed again and again — say why and what to switch on, instead of staying silent (11/6 iMac M1).
+    @discardableResult func appleDownCard(_ err: NSError) -> String {
+        let (title, fix): (String, String) =
+            err.code == 201 ? (S.t("🎙 맥 받아쓰기가 꺼져 있어요", "🎙 Dictation is off on this Mac"),
+                               S.t("시스템 설정 → 키보드 → 받아쓰기를 켜 주세요", "System Settings → Keyboard → turn on Dictation"))
+            : err.code == 102 ? (S.t("🎙 이 언어의 음성 인식 파일이 없어요", "🎙 Speech files for this language are missing"),
+                                 S.t("시스템 설정 → 키보드 → 받아쓰기를 켜고 언어에 한국어를 넣으면 받아져요", "System Settings → Keyboard → turn on Dictation with this language to download them"))
+            : (S.t("🎙 맥 음성 인식이 안 돼요 (\(err.code))", "🎙 Speech recognition isn't working (\(err.code))"),
+               S.t("시스템 설정 → 키보드 → 받아쓰기를 켜 주세요", "System Settings → Keyboard → turn on Dictation"))
+        let then = whisper.available ? S.t(" · 그동안은 위스퍼로 들어요", " · Whisper listens meanwhile")
+                                     : S.t(" · 아니면 준비 화면에서 Whisper 를 받아 주세요", " · or get Whisper in the setup window")
+        hud.show(title, fix + then, heard: nil, color: amber, speed: 1)
+        return title + " — " + fix + then
+    }
+    /// Why the name training heard nothing usable — shown in Settings under the progress bar, not left to guess.
+    func trainProblem() -> String? {
+        if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
+            return S.t("마이크 허용이 꺼져 있어요: 시스템 설정 → 개인정보 보호 및 보안 → 마이크에서 사사리사를 켜 주세요", "Microphone access is off: System Settings → Privacy & Security → Microphone → Sasarisa")
+        }
+        if SFSpeechRecognizer.authorizationStatus() != .authorized, !whisper.available {
+            return S.t("음성 인식 허용이 꺼져 있어요: 시스템 설정 → 개인정보 보호 및 보안 → 음성 인식에서 사사리사를 켜 주세요", "Speech Recognition is off: System Settings → Privacy & Security → Speech Recognition → Sasarisa")
+        }
+        if let err = ear.appleDown, !whisper.available { return appleDownCard(err) }
+        return nil
+    }
+
+    func utterance(_ t: String, audio: [Float], final: Bool = false) {
         guard enabled, !ear.holding else { return }   // push-to-talk delivers its own utterance on release
         if let tr = trainer { log("name training take: \(t)"); tr.take(t, audio); return }
         if Date() < previewUntil { log("ignored (voice preview): \(t)"); return }
@@ -314,9 +355,10 @@ final class Butler {
             if parser.instant(a) { handle(a); return }
             // A plain quick command (no words of yours to type or search) runs on Apple's text right away — Whisper only
             // adds a second or more (10/25 owner: 「음성을 받아서 진행하는데 정말 느려서 답답해 죽어」)
-            if Butler.noFreeText(parser.parse(a, hasYouTubeList: !ytList.isEmpty)) { log("quick (no Whisper wait): \(a)"); lastLive = a; command(t); return }
+            if final || Butler.noFreeText(parser.parse(a, hasYouTubeList: !ytList.isEmpty)) { log("quick (no Whisper wait): \(a)"); lastLive = a; command(t); return }
             refine(audio, t) { [weak self] full in self?.command(full) }
         case .dictation:
+            if final { dictate(t); return }
             whisper.transcribe(audio, fallback: t) { [weak self] full in self?.dictate(full) }
         case .busy:
             let a = parser.stripWake(t)
@@ -365,6 +407,13 @@ final class Butler {
             self.trainCard(tr, heard: heard)
             post(["n": n, "heard": heard, "next": n < tr.total ? tr.prompt(n, shownName: self.cfg.ko ? (Config.hangulReading(tr.name) ?? tr.name) : tr.name) : ""])
         }
+        // a voice was heard but nothing could write it down: say why (permissions, Dictation off, no Whisper) — 11/6 「아무 반응이 없어요」
+        tr.onNothing = { [weak self] in
+            guard let self else { return }
+            let why = self.trainProblem() ?? self.S.t("소리는 들렸는데 글자로 못 바꿨어요. 조금 더 또렷하게 다시 말해 주세요", "Heard a sound but couldn't write it down — say it again a little clearer")
+            if self.ear.appleDown == nil { self.hud.show(self.S.t("🎙 다시 한 번", "🎙 Once more"), why, heard: nil, color: amber) }
+            post(["problem": why])
+        }
         tr.onDone = { [weak self, weak tr] r in
             guard let self, let tr else { return }
             tr.save(r)
@@ -376,7 +425,7 @@ final class Butler {
         trainer = tr
         log("name training started: \(name)")
         trainCard(tr, heard: "")
-        post(["n": 0, "heard": "", "next": tr.prompt(0, shownName: cfg.ko ? (Config.hangulReading(tr.name) ?? tr.name) : tr.name)])
+        post(["n": 0, "heard": "", "next": tr.prompt(0, shownName: cfg.ko ? (Config.hangulReading(tr.name) ?? tr.name) : tr.name), "problem": trainProblem() ?? ""])
     }
     private func trainCard(_ tr: NameTrainer, heard: String) {
         let shown = cfg.ko ? (Config.hangulReading(tr.name) ?? tr.name) : tr.name
@@ -391,11 +440,13 @@ final class Butler {
     func nameByWhisper(_ t: String, _ audio: [Float]) {
         // every short idle utterance (≤ 3 s, a few words): 「있어」「Safari 있어」「헛소리 있어」 were the name too (10/24)
         // (also the name with a command in one breath — 「세살이 YouTube 틀어」 was 「사사리사, 유튜브 틀어」 to Whisper)
-        guard cfg.ko, whisper.available, audio.count > 6000, audio.count < 72000, Parser.squash(t).count <= 24 else { return }
+        // Apple's recognizer down: every burst of voice may be the name, in any language, and the name with a long command
+        let down = ear.appleDown != nil
+        guard cfg.ko || down, whisper.available, audio.count > 6000, audio.count < (down ? 16000 * 15 : 72000), Parser.squash(t).count <= 24 else { return }
         // only sounds that start like the name (same first consonant group: 「서 서 있어」 for 사사리사) — not every cough,
         // clap or OBS sound (10/25: it ran on all of them and commands waited behind)
         // voice with no text at all: only for a name typed in Latin letters (「Sasarisa」) — a Hangul name like 「거북아」 Apple writes itself
-        if t.isEmpty, Parser.match(cfg.assistantName, "^[가-힣\\s]+$") != nil { return }
+        if t.isEmpty, !down, Parser.match(cfg.assistantName, "^[가-힣\\s]+$") != nil { return }
         if !t.isEmpty, let n = Butler.onset(Config.hangulReading(cfg.assistantName) ?? cfg.assistantName), let h = Butler.onset(t), n != h { return }
         whisper.transcribe(audio, fallback: t, low: true) { [weak self] full in
             guard let self, self.mode == .idle else { return }
