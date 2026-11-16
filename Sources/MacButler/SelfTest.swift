@@ -156,6 +156,7 @@ enum SelfTest {
         checkBool("call, then the address", sp.stripWake("사사리사, 사사리사닷컴 열어") == "사사리사닷컴 열어")
         checkBool("our address", Parser.ourAddress("사사리싸.com 들어가 있어") == "sasarisa.com 들어가 있어" && Parser.ourAddress("싸싸리싸 닷컴을 입력해") == "sasarisa.com을 입력해")
         checkBool("cut-short 「…하면은」 is a broken routine", { if case .badRoutine = pk.parse("페이지를 내리라고 하면은", hasYouTubeList: false) { return true }; return false }())
+        checkBool("update: version order", Update.newer("0.7.10", than: "0.7.9") && Update.newer("0.8", than: "0.7.4") && !Update.newer("0.7.4", than: "0.7.4") && !Update.newer("0.7.3", than: "0.7.4"))
         // 이름 맞추기: what the recognizers wrote for the owner's voice becomes a wake word — but not common words or commands
         var momo = Config(); momo.language = "ko"
         let tr = NameTrainer(name: "모모", base: momo, whisper: nil)

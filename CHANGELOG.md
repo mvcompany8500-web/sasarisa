@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.5 — 2026-11-16 · Tells you when a new version is out
+- **Update notice:** bug fixes only reached people who downloaded again by hand, and nothing said a new version existed (4 of 12 Macs were still on 0.7.1–0.7.3). Sasarisa now reads one small file from its homepage (sasarisa.com/latest.json) at launch and twice a day; when a newer version is out it shows one card, and the menu gets **⬆︎ Get version …** — the release page, or for Homebrew installs the `brew upgrade --cask sasarisa` command copied and Terminal opened. No id, nothing about you is sent
+- `Sasarisa --update-check` prints this Mac's version and the latest one
+
 ## 0.7.4 — 2026-11-06 · Works with Dictation off, finds Codex and Claude the way your terminal does
 - **Hears you even when Mac Dictation is off:** with Siri and Dictation switched off (or the language's on-device speech files missing), Apple's recognizer fails at once — Sasarisa retried silently forever, so calling it and the name voice check did nothing (reported on an iMac M1). Now it notices within seconds, shows a card with the fix (System Settings → Keyboard → Dictation), and if Whisper is installed it listens through Whisper alone — the name, then the whole command
 - **The voice check says why nothing is counted:** microphone or speech permission off, Dictation off, or no Whisper — shown right under the progress bar in Settings and setup

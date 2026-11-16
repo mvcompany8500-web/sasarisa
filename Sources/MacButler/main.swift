@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var statusItems: [NSMenuItem] = []
     var usageItem: NSMenuItem?
     var growthItem: NSMenuItem?
+    var updateItem: NSMenuItem?
     func applicationDidFinishLaunching(_ n: Notification) {
         cfg = Config.load()
         let cfg = self.cfg
@@ -19,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "◉" + String(cfg.assistantName.prefix(1)).uppercased()
         let menu = NSMenu()
+        let up = NSMenuItem(title: "", action: #selector(openUpdate), keyEquivalent: ""); up.isHidden = true; menu.addItem(up); updateItem = up
         menu.addItem(withTitle: S.menuToggle(), action: #selector(toggle), keyEquivalent: "")
         menu.addItem(withTitle: S.menuGreet(), action: #selector(greet), keyEquivalent: "")
         menu.addItem(withTitle: S.t("설정…", "Settings…"), action: #selector(openSettings), keyEquivalent: ",")
@@ -56,6 +58,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.butler = j
                     j.start()
                     SetupWindow.showIfNeeded(cfg: cfg)
+                    // a newer version: one card the first time, then the menu item stays until it's installed
+                    let checkUpdate = { [weak self] in
+                        Update.check { v in
+                            let how = Update.viaBrew ? S.t("메뉴 ◉ → 새 판 받기 (brew 명령을 복사해 드려요)", "Menu ◉ → Get the new version (the brew command is copied)")
+                                                     : S.t("메뉴 ◉ → 새 판 받기", "Menu ◉ → Get the new version")
+                            if self?.butler?.mode == .idle { self?.butler?.hud.show(S.t("⬆︎ 사사리사 \(v) 나왔어요", "⬆︎ Sasarisa \(v) is out"), how, heard: nil, color: lime) }
+                        }
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 30) { checkUpdate() }
+                    Timer.scheduledTimer(withTimeInterval: 12 * 3600, repeats: true) { _ in checkUpdate() }
                 }
             }
         }
@@ -75,6 +87,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             FileManager.default.fileExists(atPath: cfg.whisperModelPath) && cfg.whisperBinary != nil]
         let names = [S.permMic, S.permSpeech, S.permAX, S.permScreen, S.depClaude, S.depWhisper]
         for (i, it) in statusItems.enumerated() { it.title = (ok[i] ? "✓  " : "✗  ") + names[i] }
+        if let v = Update.available {
+            updateItem?.title = S.t("⬆︎ 새 판 \(v) 받기 (지금 \(Update.current))", "⬆︎ Get version \(v) (now \(Update.current))"); updateItem?.isHidden = false
+        }
         let u = Usage.today()
         growthItem?.title = S.t("📈 배운 명령 \(Learning.store.count)개 · 클로드 없이 바로 \(Growth.state.fastHits)번 · 익힌 낱말 \(Growth.state.wordsLearned.count)개",
                                 "📈 \(Learning.store.count) learned · \(Growth.state.fastHits) done without Claude · \(Growth.state.wordsLearned.count) new words")
@@ -140,6 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if !j.enabled { j.goIdle() }
     }
     @objc func greet() { butler?.greet() }
+    @objc func openUpdate() { Update.open() }
     @objc func forgetLearned() { Learning.store = [:]; Learning.save(); log("learned commands cleared") }
     @objc func openSetup() { SetupWindow.show(cfg: cfg) }
     @objc func openSettings() { SettingsWindow.show(cfg: cfg) }
@@ -209,6 +225,13 @@ if let i = CommandLine.arguments.firstIndex(of: "--hear"), CommandLine.arguments
     exit(0)
 }
 if CommandLine.arguments.contains("--selftest") { exit(SelfTest.run() ? 0 : 1) }
+// `--update-check [as-version]`: what the update notice would say (as-version pretends to be an older app)
+if let i = CommandLine.arguments.firstIndex(of: "--update-check") {
+    let mine = CommandLine.arguments.dropFirst(i + 1).first ?? Update.current
+    let d = (try? Data(contentsOf: Update.url)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+    let v = d?["version"] as? String ?? "?"
+    print("this \(mine) · latest \(v) · newer: \(Update.newer(v, than: mine)) · brew: \(Update.viaBrew)"); exit(0)
+}
 // `--doctor` prints what a bug report needs: versions, where codex/claude/node were found, permissions, then one brain turn.
 if CommandLine.arguments.contains("--doctor") {
     setvbuf(stdout, nil, _IOLBF, 0)          // each line shows at once, even through a pipe
